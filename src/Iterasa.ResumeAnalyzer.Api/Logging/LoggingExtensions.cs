@@ -1,6 +1,7 @@
 using Asp.Versioning;
 using Iterasa.ResumeAnalyzer.Shared;
 using Iterasa.ResumeAnalyzer.Shared.Configuration;
+using Iterasa.ResumeAnalyzer.Shared.Tenancy;
 using Serilog;
 using Serilog.AspNetCore;
 using Serilog.Core;
@@ -75,7 +76,8 @@ internal static class LoggingExtensions {
             diagnosticContext.Set("RequestScheme", httpContext.Request.Scheme);
             diagnosticContext.Set("ClientIp", httpContext.Connection.RemoteIpAddress?.ToString());
             diagnosticContext.Set("UserAgent", httpContext.Request.Headers.UserAgent.ToString());
-            diagnosticContext.Set("UserId", httpContext.User.FindFirst("sub")?.Value);
+            diagnosticContext.Set("UserId", httpContext.User.FindFirst(SessionClaims.UserId)?.Value);
+            diagnosticContext.Set("TenantId", httpContext.User.FindFirst(SessionClaims.TenantId)?.Value);
             diagnosticContext.Set("ApiVersion", httpContext.RequestedApiVersion?.ToString());
 
         };

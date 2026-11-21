@@ -83,21 +83,46 @@ public sealed class ConventionRulesTests {
 
     }
 
+    /// <summary>
+    /// Las únicas acciones anónimas: sin ellas no se puede llegar a tener sesión (ADR 0017).
+    /// </summary>
+    private static readonly string[] AnonymousActions = [
+        "AntiforgeryController.GetToken",
+        "AuthController.Register",
+        "AuthController.SignIn",
+    ];
+
     /// <remarks>
     /// La API está cerrada por defecto (ADR 0016). Abrir una acción de un controller es una
-    /// decisión de seguridad que no puede colarse con un atributo: si hace falta, se cambia
-    /// esta regla en el mismo PR, a la vista de quien revisa.
+    /// decisión de seguridad que no puede colarse con un atributo: si hace falta, se añade a
+    /// <see cref="AnonymousActions" /> en el mismo PR, a la vista de quien revisa. Un controller
+    /// entero nunca es anónimo.
     /// </remarks>
     [Fact]
-    public void Controllers_Should_Not_Allow_Anonymous_Access() {
+    public void Only_The_Listed_Actions_Allow_Anonymous_Access() {
 
         var anonymous = ApiAssembly.GetTypes()
             .Where(type => type.Namespace == "Iterasa.ResumeAnalyzer.Api.Controllers")
             .SelectMany(type => type.GetMethods().Cast<System.Reflection.MemberInfo>().Prepend(type))
             .Where(member => member.IsDefined(typeof(Microsoft.AspNetCore.Authorization.AllowAnonymousAttribute), inherit: true))
-            .Select(member => $"{member.DeclaringType?.Name}.{member.Name}");
+            .Select(member => member is Type type ? type.Name : $"{member.DeclaringType?.Name}.{member.Name}");
 
-        anonymous.Should().BeEmpty();
+        anonymous.Should().BeEquivalentTo(AnonymousActions);
+
+    }
+
+    /// <remarks>
+    /// Sin política, un endpoint no tiene límite: cada controller declara la suya (ADR 0019).
+    /// </remarks>
+    [Fact]
+    public void Controllers_Should_Declare_A_Rate_Limit_Policy() {
+
+        var unlimited = ApiAssembly.GetTypes()
+            .Where(type => type.Namespace == "Iterasa.ResumeAnalyzer.Api.Controllers" && typeof(Microsoft.AspNetCore.Mvc.ControllerBase).IsAssignableFrom(type))
+            .Where(type => !type.IsDefined(typeof(Microsoft.AspNetCore.RateLimiting.EnableRateLimitingAttribute), inherit: true))
+            .Select(type => type.Name);
+
+        unlimited.Should().BeEmpty();
 
     }
 

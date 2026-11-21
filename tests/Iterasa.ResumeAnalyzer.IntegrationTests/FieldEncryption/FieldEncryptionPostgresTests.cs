@@ -42,11 +42,18 @@ public sealed class FieldEncryptionPostgresTests {
 
         await using var scope = services.CreateAsyncScope();
         var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var queries = scope.ServiceProvider.GetRequiredService<UserQueries>();
+        var queries = scope.ServiceProvider.GetRequiredService<SessionQueries>();
 
-        (await context.Users.SingleAsync(u => u.Id == id)).Email.Value.Should().Be("ana@example.test");
-        (await queries.FindDetailByIdAsync(id))!.Email.Should().Be("ana@example.test");
-        (await queries.ListAsync(PageQuery.Create(1, 10))).Items.Single().Email.Should().Be("ana@example.test");
+        var entity = await context.Users.SingleAsync(u => u.Id == id);
+        entity.Email.Value.Should().Be("ana@example.test");
+        entity.Name.Should().Be("ana");
+        var projected = (await queries.FindUserAsync(id))!;
+        projected.Email.Should().Be("ana@example.test");
+        projected.Name.Should().Be("ana");
+
+        var stored = (await database.QueryAsync("SELECT name, email FROM \"user\"")).Single();
+        ((string)stored[0]!).Should().StartWith("enc1.").And.NotContain("ana");
+        ((string)stored[1]!).Should().StartWith("enc1.").And.NotContain("ana");
 
     }
 
@@ -137,8 +144,8 @@ public sealed class FieldEncryptionPostgresTests {
         });
 
         await using var scope = second.CreateAsyncScope();
-        (await scope.ServiceProvider.GetRequiredService<UserQueries>().ListAsync(PageQuery.Create(1, 10))).Items
-            .Select(u => u.Email).Should().BeEquivalentTo("ana@example.test", "bea@example.test");
+        (await scope.ServiceProvider.GetRequiredService<AppDbContext>().Users.AsNoTracking().Select(u => u.Email.Value).ToListAsync())
+            .Should().BeEquivalentTo("ana@example.test", "bea@example.test");
 
     }
 
@@ -175,26 +182,26 @@ public sealed class FieldEncryptionPostgresTests {
 
         await using var database = await PostgresTestDatabase.CreateAsync();
         var services = database.CreateServices();
-        await AddUserAsync(services, "ana", "ana@example.test");
+        var ana = await AddUserAsync(services, "ana", "ana@example.test");
 
         EncryptionKeyRecord next;
         await using (var scope = services.CreateAsyncScope()) {
             next = await scope.ServiceProvider.GetRequiredService<EncryptionKeyRotation>()
                 .RotateAsync(CryptoScopes.Platform, KeyPurpose.Encryption, CancellationToken.None);
         }
-        await AddUserAsync(services, "bea", "bea@example.test");
+        var bea = await AddUserAsync(services, "bea", "bea@example.test");
 
-        var stored = (await database.QueryAsync("SELECT username, email FROM \"user\" ORDER BY username"))
-            .ToDictionary(row => (string)row[0]!, row => FieldCipher.KeyIdOf((string)row[1]!));
-        stored["bea"].Should().Be(next.KeyId);
-        stored["ana"].Should().NotBe(next.KeyId);
+        var stored = (await database.QueryAsync("SELECT id, email FROM \"user\""))
+            .ToDictionary(row => (Guid)row[0]!, row => FieldCipher.KeyIdOf((string)row[1]!));
+        stored[bea].Should().Be(next.KeyId);
+        stored[ana].Should().NotBe(next.KeyId);
 
         var statuses = await database.QueryAsync("SELECT version, status FROM encryption_key WHERE purpose = 'enc' ORDER BY version");
         statuses.Select(s => ((int)s[0]!, (string)s[1]!)).Should().Equal((1, "decrypt_only"), (2, "active"));
 
         await using var read = services.CreateAsyncScope();
-        (await read.ServiceProvider.GetRequiredService<UserQueries>().ListAsync(PageQuery.Create(1, 10))).Items
-            .Select(u => u.Email).Should().BeEquivalentTo("ana@example.test", "bea@example.test");
+        (await read.ServiceProvider.GetRequiredService<AppDbContext>().Users.AsNoTracking().Select(u => u.Email.Value).ToListAsync())
+            .Should().BeEquivalentTo("ana@example.test", "bea@example.test");
 
     }
 
@@ -203,16 +210,18 @@ public sealed class FieldEncryptionPostgresTests {
 
         await using var database = await PostgresTestDatabase.CreateAsync();
         var services = database.CreateServices();
-        await AddUserAsync(services, "ana", "ana@example.test");
+        var ana = await AddUserAsync(services, "ana", "ana@example.test");
 
         await using (var scope = services.CreateAsyncScope()) {
             await scope.ServiceProvider.GetRequiredService<EncryptionKeyRotation>()
                 .RotateAsync(CryptoScopes.Platform, KeyPurpose.BlindIndex, CancellationToken.None);
         }
-        await AddUserAsync(services, "bea", "bea@example.test");
+        var bea = await AddUserAsync(services, "bea", "bea@example.test");
 
-        var versions = await database.QueryAsync("SELECT username, email_bidx_v FROM \"user\" ORDER BY username");
-        versions.Select(v => ((string)v[0]!, (int)v[1]!)).Should().Equal(("ana", 1), ("bea", 2));
+        var versions = (await database.QueryAsync("SELECT id, email_bidx_v FROM \"user\""))
+            .ToDictionary(row => (Guid)row[0]!, row => (int)row[1]!);
+        versions[ana].Should().Be(1);
+        versions[bea].Should().Be(2);
 
         await using var search = services.CreateAsyncScope();
         var users = search.ServiceProvider.GetRequiredService<UserRepository>();
@@ -264,7 +273,7 @@ public sealed class FieldEncryptionPostgresTests {
     private static async Task<Guid> AddUserAsync(IServiceProvider services, string username, string email) {
         await using var scope = services.CreateAsyncScope();
         var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var user = User.Create(new UserCreationArgs(Guid.NewGuid(), username, email, Guid.Empty), Now);
+        var user = User.Create(new UserCreationArgs(Guid.NewGuid(), username, email, PasswordHash: null, Guid.Empty), Now);
         context.Users.Add(user);
         await context.SaveChangesAsync();
         return user.Id;

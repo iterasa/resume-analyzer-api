@@ -5,59 +5,64 @@ using Iterasa.ResumeAnalyzer.Shared;
 namespace Iterasa.ResumeAnalyzer.Domain.Users;
 
 /// <summary>
-/// Usuario registrado en la API.
+/// Persona del equipo de una o varias empresas: quien inicia sesión.
 /// </summary>
 /// <remarks>
-/// Raíz del agregado. El límite es el usuario porque ese es el alcance de todas sus
-/// operaciones: alta, baja y reactivación.
+/// Raíz del agregado. No pertenece a una empresa: su papel en cada una lo dice su membresía
+/// (<see cref="Tenants.Membership" />). Por eso sus datos van con las llaves de plataforma
+/// (ADR 0015, decisión 9).
 /// </remarks>
 internal sealed class User : AuditableEntity {
 
-    public const int MaxUsernameLength = 100;
+    public const int MaxNameLength = 100;
+    public const int MaxJobTitleLength = 100;
+    public const int MaxPasswordHashLength = 512;
 
     private User() {
     }
 
-    /// <summary>Identificador.</summary>
+    /// <summary>Identificador. Es el claim <c>sub</c> de su sesión.</summary>
     public Guid Id { get; private set; }
 
-    /// <summary>Nombre único.</summary>
-    public string Username { get; private set; } = string.Empty;
+    /// <summary>Nombre visible. Cifrado.</summary>
+    public string Name { get; private set; } = string.Empty;
 
-    /// <summary>Correo de contacto, único.</summary>
+    /// <summary>Correo con el que inicia sesión, único. Cifrado y buscable por índice ciego.</summary>
     public Email Email { get; private set; } = null!;
+
+    /// <summary>Cargo, opcional.</summary>
+    public string? JobTitle { get; private set; }
+
+    /// <summary>Hash de la contraseña, con su algoritmo y parámetros. Nulo si aún no la tiene.</summary>
+    public string? PasswordHash { get; private set; }
+
+    /// <summary>Intentos de inicio de sesión fallidos consecutivos. Lo actualiza el repositorio de forma atómica.</summary>
+    public int FailedSignInAttempts { get; private set; }
+
+    /// <summary>Instante hasta el que está bloqueado por intentos fallidos.</summary>
+    public DateTimeOffset? LockedUntilUtc { get; private set; }
+
+    /// <summary>Instante en que verificó su correo. Nulo mientras no lo haga.</summary>
+    public DateTimeOffset? EmailVerifiedAtUtc { get; private set; }
+
+    /// <summary>Indica si verificó su correo.</summary>
+    public bool IsEmailVerified => EmailVerifiedAtUtc is not null;
 
     /// <summary>
     /// Crea un usuario habilitado.
     /// </summary>
-    /// <param name="args">Datos del alta.</param>
-    /// <param name="now">Instante del alta.</param>
-    /// <exception cref="DomainException">Cuando el identificador está vacío o el nombre o el correo no son válidos.</exception>
+    /// <exception cref="DomainException">Cuando el identificador está vacío o el nombre, el correo o el hash no son válidos.</exception>
     public static User Create(UserCreationArgs args, DateTimeOffset now) {
 
         if (args.Id == Guid.Empty) {
             throw new DomainException("Id cannot be empty.");
         }
 
-        if (string.IsNullOrWhiteSpace(args.Username)) {
-            throw new DomainException("Username is required.");
-        }
-
-        if (args.Username.Trim().Length > MaxUsernameLength) {
-            throw new DomainException($"Username cannot exceed {MaxUsernameLength} characters.");
-        }
-
-        // Caracteres de control (saltos de línea, ESC, NUL), de formato (anchura cero,
-        // bidi) y separadores de línea: ninguno tiene sentido en un nombre, y viajan a los
-        // logs y a PostgreSQL.
-        if (UnsafeText.Contains(args.Username.Trim())) {
-            throw new DomainException("Username cannot contain control, format or line separator characters.");
-        }
-
         var user = new User {
             Id = args.Id,
-            Username = args.Username.Trim(),
-            Email = Email.Create(args.Email)
+            Name = DomainText.Required(args.Name, "Name", MaxNameLength),
+            Email = Email.Create(args.Email),
+            PasswordHash = args.PasswordHash is null ? null : RequireHash(args.PasswordHash),
         };
 
         user.SetCreated(args.ActorId, now);
@@ -65,15 +70,23 @@ internal sealed class User : AuditableEntity {
 
     }
 
+    // --- Autenticación -------------------------------------------------------------
+
+    /// <summary>Indica si está bloqueado por intentos fallidos en el instante indicado.</summary>
+    public bool IsLockedOut(DateTimeOffset now) => LockedUntilUtc is not null && LockedUntilUtc > now;
+
+    /// <summary>Indica si puede iniciar sesión en el instante indicado.</summary>
+    public bool CanAuthenticate(DateTimeOffset now) => IsEnabled && PasswordHash is not null && !IsLockedOut(now);
+
+    // Los intentos fallidos, el bloqueo y el rehash no tienen verbo aquí: los escribe el
+    // repositorio con una actualización atómica. Leer, sumar y guardar perdería los intentos
+    // simultáneos y dejaría probar contraseñas en ráfagas sin llegar al bloqueo.
+
     // --- Estado ----------------------------------------------------------------------
 
     /// <summary>
-    /// Da de baja al usuario.
+    /// Da de baja al usuario. Nadie puede darse de baja a sí mismo.
     /// </summary>
-    /// <remarks>
-    /// Nadie puede darse de baja a sí mismo. Sin esta invariante, quien administra la API
-    /// podía dejarse fuera.
-    /// </remarks>
     public void Suspend(Guid actorId, DateTimeOffset now) {
 
         if (actorId == Id) {
@@ -86,5 +99,10 @@ internal sealed class User : AuditableEntity {
 
     /// <summary>Reactiva a un usuario dado de baja.</summary>
     public void Reinstate(Guid actorId, DateTimeOffset now) => MarkEnabled(actorId, now);
+
+    private static string RequireHash(string passwordHash) =>
+        string.IsNullOrWhiteSpace(passwordHash) || passwordHash.Length > MaxPasswordHashLength
+            ? throw new DomainException("PasswordHash is invalid.")
+            : passwordHash;
 
 }

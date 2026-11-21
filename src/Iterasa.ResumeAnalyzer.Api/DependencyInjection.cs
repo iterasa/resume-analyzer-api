@@ -1,9 +1,12 @@
 using Asp.Versioning;
 using Iterasa.ResumeAnalyzer.Api.Http;
+using Iterasa.ResumeAnalyzer.Api.Idempotency;
 using Iterasa.ResumeAnalyzer.Api.Logging;
 using Iterasa.ResumeAnalyzer.Api.OpenApi;
 using Iterasa.ResumeAnalyzer.Api.Problems;
+using Iterasa.ResumeAnalyzer.Api.RateLimiting;
 using Iterasa.ResumeAnalyzer.Api.Security;
+using Iterasa.ResumeAnalyzer.Shared.Configuration;
 using Microsoft.AspNetCore.Mvc.Formatters;
 using Microsoft.Extensions.DependencyInjection;
 using System.Diagnostics;
@@ -56,6 +59,8 @@ public static class DependencyInjection {
                 options.OutputFormatters.RemoveType<StringOutputFormatter>();
                 options.OutputFormatters.OfType<SystemTextJsonOutputFormatter>().Single().SupportedMediaTypes.Remove("text/json");
                 options.Conventions.Add(new ProblemResponseContentTypeConvention());
+                // CSRF en toda mutación, como la autenticación: cerrado por defecto (ADR 0017).
+                options.Filters.AddService<AntiforgeryValidationFilter>();
             })
             // Los enums viajan por nombre, no por su valor numérico: legibles, estables ante
             // un reorden y así los documenta OpenAPI. Se configura también en las opciones
@@ -83,6 +88,26 @@ public static class DependencyInjection {
         services.AddConfiguredForwardedHeaders();
         services.AddConfiguredCors();
         services.AddConfiguredAuthentication();
+        services.AddConfiguredAntiforgery();
+        services.AddConfiguredRateLimiting();
+        services.AddIdempotency();
+
+        return services;
+
+    }
+
+    private static IServiceCollection AddIdempotency(this IServiceCollection services) {
+
+        services
+            .AddOptions<IdempotencyOptions>()
+            .Configure(options => options.Retention = TimeSpan.FromHours(
+                EnvironmentVariableReader.GetInt(EnvironmentVariables.IdempotencyKeyTtlHours, IdempotencyOptions.DefaultRetentionHours)))
+            .Validate(
+                options => options.Retention > TimeSpan.Zero,
+                $"{EnvironmentVariables.IdempotencyKeyTtlHours} must be greater than zero.")
+            .ValidateOnStart();
+
+        services.AddScoped<IdempotencyFilter>();
 
         return services;
 

@@ -21,14 +21,25 @@ internal sealed class CorsPolicyOptions {
     public static readonly string[] AllowedMethods = ["GET", "POST", "PUT", "DELETE"];
 
     /// <summary>Cabeceras que un navegador puede enviar desde otro origen.</summary>
-    public static readonly string[] AllowedHeaders = [HeaderNames.Authorization, HeaderNames.ContentType, CorrelationIdExtensions.HeaderName];
+    public static readonly string[] AllowedHeaders = [
+        HeaderNames.Authorization,
+        HeaderNames.ContentType,
+        CorrelationIdExtensions.HeaderName,
+        Security.AntiforgeryExtensions.HeaderName,
+        Idempotency.IdempotencyFilter.HeaderName,
+    ];
 
     /// <summary>
     /// Cabeceras de respuesta que el script del navegador puede leer. Sin esta lista solo
     /// ve las «seguras» (<c>Content-Type</c> y poco más): ni la correlación para reportar
     /// un error, ni <c>Retry-After</c> tras un 429, ni <c>Location</c> tras un 201.
     /// </summary>
-    public static readonly string[] ExposedHeaders = [CorrelationIdExtensions.HeaderName, HeaderNames.RetryAfter, HeaderNames.Location];
+    public static readonly string[] ExposedHeaders = [
+        CorrelationIdExtensions.HeaderName,
+        HeaderNames.RetryAfter,
+        HeaderNames.Location,
+        Idempotency.IdempotencyFilter.ReplayedHeaderName,
+    ];
 
     /// <summary>Indica si la política está activa. Desactivada, la API no emite cabecera CORS alguna.</summary>
     public bool Enabled { get; set; }

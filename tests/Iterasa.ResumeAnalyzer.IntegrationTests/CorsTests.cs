@@ -36,19 +36,19 @@ public sealed class CorsTests(CorsTests.CorsEnabledFactory factory) : IClassFixt
     [Fact]
     public async Task Preflight_From_An_Allowed_Origin_Should_Grant_Only_What_The_Api_Uses() {
 
-        using var preflight = new HttpRequestMessage(HttpMethod.Options, $"/api/v1/users/{factory.SeededUserId}");
+        using var preflight = new HttpRequestMessage(HttpMethod.Options, $"/api/v1/vacancies/{Guid.NewGuid()}");
         preflight.Headers.Add("Origin", AppOrigin);
         preflight.Headers.Add("Access-Control-Request-Method", "PUT");
-        preflight.Headers.Add("Access-Control-Request-Headers", "authorization, content-type");
+        preflight.Headers.Add("Access-Control-Request-Headers", "content-type, x-xsrf-token, idempotency-key");
 
         var response = await factory.CreateClient().SendAsync(preflight);
 
         response.StatusCode.Should().Be(HttpStatusCode.NoContent);
         response.Headers.GetValues("Access-Control-Allow-Origin").Should().ContainSingle().Which.Should().Be(AppOrigin);
         response.Headers.GetValues("Access-Control-Allow-Methods").Should().ContainSingle().Which.Should().Contain("PUT").And.NotContain("PATCH");
-        string.Join(",", response.Headers.GetValues("Access-Control-Allow-Headers")).ToLowerInvariant().Should().Contain("authorization").And.Contain("content-type");
+        string.Join(",", response.Headers.GetValues("Access-Control-Allow-Headers")).ToLowerInvariant().Should().Contain("x-xsrf-token").And.Contain("content-type").And.Contain("idempotency-key");
         response.Headers.GetValues("Access-Control-Max-Age").Should().ContainSingle().Which.Should().Be("600");
-        response.Headers.Contains("Access-Control-Allow-Credentials").Should().BeFalse("bearer tokens are not browser credentials");
+        response.Headers.Contains("Access-Control-Allow-Credentials").Should().BeFalse("credentials are off unless configured");
 
     }
 
@@ -61,7 +61,7 @@ public sealed class CorsTests(CorsTests.CorsEnabledFactory factory) : IClassFixt
     [InlineData("null")]
     public async Task Preflight_From_Any_Other_Origin_Should_Grant_Nothing(string origin, string? because = null) {
 
-        using var preflight = new HttpRequestMessage(HttpMethod.Options, "/api/v1/users");
+        using var preflight = new HttpRequestMessage(HttpMethod.Options, "/api/v1/vacancies");
         preflight.Headers.Add("Origin", origin);
         preflight.Headers.Add("Access-Control-Request-Method", "GET");
 
@@ -78,7 +78,7 @@ public sealed class CorsTests(CorsTests.CorsEnabledFactory factory) : IClassFixt
     [InlineData("http://localhost:5173")]
     public async Task Wildcard_And_Local_Origins_Should_Be_Allowed(string origin) {
 
-        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/v1/users");
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/v1/vacancies");
         request.Headers.Add("Origin", origin);
 
         var response = await factory.CreateClient().SendAsync(request);
@@ -94,10 +94,11 @@ public sealed class CorsTests(CorsTests.CorsEnabledFactory factory) : IClassFixt
     [Fact]
     public async Task Error_Responses_Should_Carry_The_Cors_Headers_And_Expose_The_Correlation_Id() {
 
-        using var request = new HttpRequestMessage(HttpMethod.Get, $"/api/v1/users/{Guid.NewGuid()}");
+        var admin = await factory.RegisterAsync();
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"/api/v1/vacancies/{Guid.NewGuid()}");
         request.Headers.Add("Origin", AppOrigin);
 
-        var response = await factory.CreateClient().SendAsync(request);
+        var response = await admin.Browser.SendAsync(request);
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
         response.Headers.GetValues("Access-Control-Allow-Origin").Should().ContainSingle().Which.Should().Be(AppOrigin);

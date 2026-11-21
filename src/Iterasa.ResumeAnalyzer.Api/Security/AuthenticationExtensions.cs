@@ -1,51 +1,42 @@
+using Iterasa.ResumeAnalyzer.Shared;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.Extensions.Options;
-using System.Text.Encodings.Web;
 
 namespace Iterasa.ResumeAnalyzer.Api.Security;
 
 /// <summary>
-/// Autenticación y autorización de la API: cerrada por defecto (ADR 0016).
+/// Autenticación y autorización: cerrada por defecto (ADR 0016), con sesión del lado del
+/// servidor (ADR 0017) y permisos por rol en la empresa activa (ADR 0018).
 /// </summary>
 /// <remarks>
-/// Toda ruta exige un usuario autenticado salvo que se declare anónima de forma explícita
-/// (las sondas de salud y el documento OpenAPI). Así, un endpoint nuevo nace protegido: olvidar
-/// un atributo deja la ruta cerrada, no abierta.
+/// Toda ruta exige una sesión salvo que se declare anónima de forma explícita. Además, cada
+/// permiso del catálogo es una política con su mismo nombre: un endpoint declara lo que
+/// necesita (<c>[Authorize(Policy = Permissions.VacanciesManage)]</c>), no «ser administrador».
 /// </remarks>
 internal static class AuthenticationExtensions {
 
-    /// <summary>Esquema provisional mientras no exista el inicio de sesión.</summary>
-    public const string PendingSessionScheme = "PendingSession";
-
-    /// <summary>
-    /// Registra el esquema y la política por defecto. Cuando llegue el inicio de sesión con
-    /// cookie, sustituye a <see cref="PendingSessionScheme" />; la política no cambia.
-    /// </summary>
+    /// <summary>Registra el esquema de sesión, la política por defecto y una política por permiso.</summary>
     public static IServiceCollection AddConfiguredAuthentication(this IServiceCollection services) {
 
         services
-            .AddAuthentication(PendingSessionScheme)
-            .AddScheme<AuthenticationSchemeOptions, PendingSessionAuthenticationHandler>(PendingSessionScheme, configureOptions: null);
+            .AddAuthentication(SessionAuthenticationHandler.SchemeName)
+            .AddScheme<AuthenticationSchemeOptions, SessionAuthenticationHandler>(SessionAuthenticationHandler.SchemeName, configureOptions: null);
 
-        services
+        var authorization = services
             .AddAuthorizationBuilder()
             .SetFallbackPolicy(new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build());
+
+        foreach (var permission in Permissions.All) {
+            authorization.AddPolicy(permission, policy => policy
+                .RequireAuthenticatedUser()
+                .AddRequirements(new PermissionRequirement(permission)));
+        }
+
+        services.AddSingleton<IAuthorizationHandler, PermissionAuthorizationHandler>();
+        services.AddSingleton<IAuthorizationMiddlewareResultHandler, AuditingAuthorizationResultHandler>();
 
         return services;
 
     }
-
-}
-
-/// <summary>
-/// Todavía no hay inicio de sesión: ninguna petición queda autenticada, así que toda ruta
-/// protegida responde 401 (Problem Details) en lugar de quedar abierta.
-/// </summary>
-internal sealed class PendingSessionAuthenticationHandler(
-    IOptionsMonitor<AuthenticationSchemeOptions> options, ILoggerFactory logger, UrlEncoder encoder)
-    : AuthenticationHandler<AuthenticationSchemeOptions>(options, logger, encoder) {
-
-    protected override Task<AuthenticateResult> HandleAuthenticateAsync() => Task.FromResult(AuthenticateResult.NoResult());
 
 }

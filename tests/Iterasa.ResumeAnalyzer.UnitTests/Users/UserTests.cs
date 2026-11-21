@@ -11,13 +11,13 @@ public sealed class UserTests {
     private static readonly Guid ActorId = new("22222222-2222-2222-2222-222222222222");
     private static readonly DateTimeOffset Now = new(2026, 9, 12, 12, 0, 0, TimeSpan.Zero);
 
-    private static User Create(string username = "johndoe", string email = "john@example.com", Guid? id = null) =>
-        User.Create(new UserCreationArgs(id ?? UserId, username, email, ActorId), Now);
+    private static User Create(string name = "John Doe", string email = "john@example.com", Guid? id = null, string? passwordHash = "$argon2id$v=19$m=19456,t=2,p=1$c2FsdA$aGFzaA") =>
+        User.Create(new UserCreationArgs(id ?? UserId, name, email, passwordHash, ActorId), Now);
 
     [Fact]
     public void Create_Should_Return_An_Enabled_User_With_A_Normalized_Email() {
         var user = Create(email: "  JOHN@Example.com  ");
-        user.Username.Should().Be("johndoe");
+        user.Name.Should().Be("John Doe");
         user.Email.Value.Should().Be("john@example.com");
         user.IsEnabled.Should().BeTrue();
     }
@@ -25,14 +25,14 @@ public sealed class UserTests {
     [Theory]
     [InlineData("")]
     [InlineData("   ")]
-    public void Create_Should_Throw_When_Username_Is_Missing(string username) {
-        var act = () => Create(username: username);
+    public void Create_Should_Throw_When_Name_Is_Missing(string name) {
+        var act = () => Create(name: name);
         act.Should().Throw<DomainException>();
     }
 
     [Fact]
-    public void Create_Should_Throw_When_Username_Is_Too_Long() {
-        var act = () => Create(username: new string('a', User.MaxUsernameLength + 1));
+    public void Create_Should_Throw_When_Name_Is_Too_Long() {
+        var act = () => Create(name: new string('a', User.MaxNameLength + 1));
         act.Should().Throw<DomainException>();
     }
 
@@ -45,8 +45,8 @@ public sealed class UserTests {
     [InlineData("john\u2028doe")]
     [InlineData("john\u2029doe")]
     [InlineData("john\U000E0041doe")]
-    public void Create_Should_Throw_When_Username_Has_Control_Or_Format_Characters(string username) {
-        var act = () => Create(username: username);
+    public void Create_Should_Throw_When_Name_Has_Control_Or_Format_Characters(string name) {
+        var act = () => Create(name: name);
         act.Should().Throw<DomainException>();
     }
 
@@ -55,14 +55,14 @@ public sealed class UserTests {
     /// sobrevive a la serialización de los casos de la teoría.
     /// </remarks>
     [Fact]
-    public void Create_Should_Throw_When_Username_Has_A_Lone_Surrogate() {
-        var act = () => Create(username: "john" + (char)0xD800 + "doe");
+    public void Create_Should_Throw_When_Name_Has_A_Lone_Surrogate() {
+        var act = () => Create(name: "john" + (char)0xD800 + "doe");
         act.Should().Throw<DomainException>();
     }
 
     [Fact]
     public void Create_Should_Still_Trim_Surrounding_Whitespace() {
-        Create(username: "\tjohndoe\r\n").Username.Should().Be("johndoe");
+        Create(name: "\tJohn Doe\r\n").Name.Should().Be("John Doe");
     }
 
     [Fact]
@@ -96,6 +96,15 @@ public sealed class UserTests {
         user.UpdatedBy.Should().Be(ActorId);
         user.CreatedAtUtc.Should().Be(Now, "creation is stamped once");
 
+    }
+
+    [Fact]
+    public void A_User_Without_Password_Or_Disabled_Cannot_Authenticate() {
+        Create(passwordHash: null).CanAuthenticate(Now).Should().BeFalse();
+        var user = Create();
+        user.CanAuthenticate(Now).Should().BeTrue();
+        user.Suspend(ActorId, Now);
+        user.CanAuthenticate(Now).Should().BeFalse();
     }
 
     [Fact]

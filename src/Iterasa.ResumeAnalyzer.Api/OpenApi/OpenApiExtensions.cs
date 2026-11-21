@@ -41,6 +41,7 @@ internal static class OpenApiExtensions {
 
             options.Document.AddDocumentTransformer(new DocumentInfoTransformer(options.Description));
             options.Document.AddDocumentTransformer<HealthEndpointsDocumentTransformer>();
+            options.Document.AddOperationTransformer<IdempotencyKeyOperationTransformer>();
 
             var documentation = DocumentedAssemblies
                 .Select(assembly => Path.Combine(AppContext.BaseDirectory, $"{ApplicationInfo.Name}.{assembly}.xml"))

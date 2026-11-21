@@ -5,6 +5,7 @@ using Iterasa.ResumeAnalyzer.Api.Logging;
 using Iterasa.ResumeAnalyzer.Api.OpenApi;
 using Iterasa.ResumeAnalyzer.Application;
 using Iterasa.ResumeAnalyzer.Infrastructure;
+using Iterasa.ResumeAnalyzer.Infrastructure.Tenancy;
 using Iterasa.ResumeAnalyzer.Shared.Configuration;
 using Serilog;
 
@@ -47,6 +48,15 @@ try {
 
     }
 
+    // Las cookies son Secure fuera de desarrollo (ADR 0017): tras un proxy que termina TLS, sin
+    // las cabeceras reenviadas la API ve HTTP y el antiforgery se niega a emitir tokens.
+    if (!app.Environment.IsDevelopment() && !app.Environment.IsEnvironment("Testing") && !ProxyHeadersExtensions.IsEnabled) {
+        Log.Warning(
+            "Cookies are Secure but {ForwardedHeadersVariable} is off: behind a TLS-terminating proxy every request looks like HTTP "
+            + "and antiforgery tokens cannot be issued. Enable it, or terminate TLS in Kestrel.",
+            EnvironmentVariables.ForwardedHeadersEnabled);
+    }
+
     // Las cabeceras de seguridad van fuera del manejador de excepciones para que también
     // las lleve una respuesta de error. Este envuelve al resto del pipeline; la
     // correlación se establece antes del logging para que todo evento la lleve.
@@ -63,8 +73,12 @@ try {
     app.UseConfiguredCors();
 
     // Después de CORS (un preflight no lleva credenciales) y antes de los endpoints: toda ruta
-    // exige sesión salvo las declaradas anónimas (ADR 0016).
+    // exige sesión salvo las declaradas anónimas (ADR 0016). La empresa de la sesión se abre
+    // para el resto de la petición (ADR 0018), y el limitador va tras la autenticación para
+    // particionar por usuario.
     app.UseAuthentication();
+    app.UseTenantContext();
+    app.UseRateLimiter();
     app.UseAuthorization();
 
     app.MapControllers();

@@ -71,6 +71,22 @@ public sealed class FieldEncryptionRulesTests {
         }
     }
 
+    /// <remarks>
+    /// El aislamiento entre empresas no depende de que cada consulta recuerde su <c>Where</c>
+    /// (ADR 0018): toda entidad de empresa lleva el filtro del contexto.
+    /// </remarks>
+    [Fact]
+    public void Every_Tenant_Owned_Entity_Has_The_Tenant_Query_Filter() {
+
+        var tenantOwned = Model.GetEntityTypes()
+            .Where(type => type.ClrType.GetInterfaces().Any(contract => contract.FullName == "Iterasa.ResumeAnalyzer.Domain.Common.ITenantOwned"))
+            .ToList();
+
+        tenantOwned.Select(type => type.ClrType.Name).Should().Contain(["Membership", "Vacancy", "Requirement"]);
+        tenantOwned.Should().AllSatisfy(type => type.GetDeclaredQueryFilters().Should().NotBeEmpty($"{type.ClrType.Name} belongs to a tenant"));
+
+    }
+
     private static IEnumerable<Microsoft.EntityFrameworkCore.Metadata.IProperty> EncryptedProperties() =>
         Model.GetEntityTypes().SelectMany(type => type.GetProperties()).Where(property => property.FindEncryptedField() is not null);
 

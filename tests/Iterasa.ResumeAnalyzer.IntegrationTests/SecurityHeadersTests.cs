@@ -9,11 +9,12 @@ public sealed class SecurityHeadersTests(CustomWebApplicationFactory factory) : 
 
     [Theory]
     [InlineData("/health", HttpStatusCode.OK)]
-    [InlineData("/api/v1/users", HttpStatusCode.OK)]
+    [InlineData("/api/v1/me", HttpStatusCode.OK)]
     [InlineData("/api/v1/route-that-does-not-exist", HttpStatusCode.NotFound)]
     public async Task Every_Response_Should_Carry_The_Security_Headers(string path, HttpStatusCode expectedStatus) {
 
-        var response = await factory.CreateClient().GetAsync(path);
+        var admin = await factory.RegisterAsync();
+        var response = await admin.Browser.GetAsync(path);
 
         response.StatusCode.Should().Be(expectedStatus);
         response.Headers.GetValues("X-Content-Type-Options").Should().ContainSingle().Which.Should().Be("nosniff");

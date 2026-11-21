@@ -24,7 +24,8 @@ internal static class EncryptedPropertyBuilderExtensions {
     /// Cifra la columna con su campo del inventario. La columna no lleva límite de longitud: el
     /// criptograma mide más que el dato, y el límite se valida sobre el texto en el dominio.
     /// </summary>
-    public static PropertyBuilder<string> IsEncrypted(this PropertyBuilder<string> builder, EncryptedField field) =>
+    /// <remarks>Genérico para admitir también <c>string?</c>; el modelo rechaza cualquier otro tipo.</remarks>
+    public static PropertyBuilder<TProperty> IsEncrypted<TProperty>(this PropertyBuilder<TProperty> builder, EncryptedField field) =>
         builder.HasAnnotation(Annotation, field.Name);
 
     /// <summary>Campo cifrado de una propiedad del modelo, si lo es.</summary>
@@ -138,15 +139,24 @@ internal sealed class EfFieldEncryption : IFieldValueProtector {
     }
 
     /// <summary>Carga los anillos que la operación puede necesitar: plataforma y, si hay, la empresa vigente.</summary>
-    internal async ValueTask WarmUpAsync(CancellationToken cancellationToken) {
+    /// <remarks>
+    /// La empresa puede estar dándose de alta en este mismo guardado, con sus llaves aún sin
+    /// confirmar: entonces no se precarga su anillo (no hay nada que leer todavía). Si algún campo
+    /// suyo llegara a cifrarse, el conversor pediría el anillo y fallaría cerrado.
+    /// </remarks>
+    internal async ValueTask WarmUpAsync(DbContext? context, CancellationToken cancellationToken) {
         if (rings is null || KeyStoreAccess.IsLoading) {
             return;
         }
         await rings.GetAsync(CryptoScopes.Platform, cancellationToken);
-        if (TenantCryptoScope.Current is { } tenantId) {
+        if (TenantCryptoScope.Current is { } tenantId && !rings.IsLoaded(tenantId) && !IsBeingProvisioned(context, tenantId)) {
             await rings.GetAsync(tenantId, cancellationToken);
         }
     }
+
+    private static bool IsBeingProvisioned(DbContext? context, Guid scopeId) =>
+        context is not null
+        && context.ChangeTracker.Entries<EncryptionKeyRecord>().Any(entry => entry.State == EntityState.Added && entry.Entity.ScopeId == scopeId);
 
     /// <summary>Calcula los índices ciegos de lo que se va a guardar.</summary>
     internal void ComputeBlindIndexes(DbContext context) {
@@ -212,7 +222,7 @@ internal sealed class EfFieldEncryption : IFieldValueProtector {
 internal sealed class FieldEncryptionSaveChangesInterceptor(EfFieldEncryption encryption) : SaveChangesInterceptor {
 
     public override InterceptionResult<int> SavingChanges(DbContextEventData eventData, InterceptionResult<int> result) {
-        encryption.WarmUpAsync(CancellationToken.None).AsTask().GetAwaiter().GetResult();
+        encryption.WarmUpAsync(eventData.Context, CancellationToken.None).AsTask().GetAwaiter().GetResult();
         if (eventData.Context is { } context) {
             encryption.ComputeBlindIndexes(context);
         }
@@ -221,7 +231,7 @@ internal sealed class FieldEncryptionSaveChangesInterceptor(EfFieldEncryption en
 
     public override async ValueTask<InterceptionResult<int>> SavingChangesAsync(
         DbContextEventData eventData, InterceptionResult<int> result, CancellationToken cancellationToken = default) {
-        await encryption.WarmUpAsync(cancellationToken);
+        await encryption.WarmUpAsync(eventData.Context, cancellationToken);
         if (eventData.Context is { } context) {
             encryption.ComputeBlindIndexes(context);
         }
@@ -235,13 +245,13 @@ internal sealed class FieldEncryptionWarmupInterceptor(EfFieldEncryption encrypt
 
     public override InterceptionResult<DbDataReader> ReaderExecuting(
         DbCommand command, CommandEventData eventData, InterceptionResult<DbDataReader> result) {
-        encryption.WarmUpAsync(CancellationToken.None).AsTask().GetAwaiter().GetResult();
+        encryption.WarmUpAsync(eventData.Context, CancellationToken.None).AsTask().GetAwaiter().GetResult();
         return result;
     }
 
     public override async ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(
         DbCommand command, CommandEventData eventData, InterceptionResult<DbDataReader> result, CancellationToken cancellationToken = default) {
-        await encryption.WarmUpAsync(cancellationToken);
+        await encryption.WarmUpAsync(eventData.Context, cancellationToken);
         return result;
     }
 

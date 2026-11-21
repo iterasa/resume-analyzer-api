@@ -69,4 +69,59 @@ public static class EnvironmentVariables {
     /// <summary>Llave maestra local: 32 bytes en base64. Nunca en producción.</summary>
     public const string FieldEncryptionLocalKek = "FIELD_ENCRYPTION_LOCAL_KEK";
 
+    /// <summary>Minutos de inactividad tras los que una sesión vence.</summary>
+    public const string SessionIdleMinutes = "SESSION_IDLE_MINUTES";
+
+    /// <summary>Horas desde el inicio de sesión tras las que una sesión vence aunque se use.</summary>
+    public const string SessionAbsoluteHours = "SESSION_ABSOLUTE_HOURS";
+
+    /// <summary>
+    /// Algoritmo de los hashes de contraseña nuevos: <c>argon2id</c> (por defecto) o
+    /// <c>pbkdf2-sha256</c> (FIPS-140). Los existentes se verifican con el suyo y se rehacen
+    /// en el siguiente inicio de sesión.
+    /// </summary>
+    public const string PasswordHashAlgorithm = "PASSWORD_HASH_ALGORITHM";
+
+    /// <summary>Memoria de Argon2id en KiB. OWASP: 19456 con 2 iteraciones.</summary>
+    public const string Argon2MemoryKib = "ARGON2_MEMORY_KIB";
+
+    /// <summary>Iteraciones de Argon2id.</summary>
+    public const string Argon2Iterations = "ARGON2_ITERATIONS";
+
+    /// <summary>Paralelismo de Argon2id.</summary>
+    public const string Argon2Parallelism = "ARGON2_PARALLELISM";
+
+    /// <summary>Intentos fallidos consecutivos que bloquean el inicio de sesión.</summary>
+    public const string AuthMaxFailedSignIns = "AUTH_MAX_FAILED_SIGN_INS";
+
+    /// <summary>Minutos que dura el bloqueo por intentos fallidos.</summary>
+    public const string AuthLockoutMinutes = "AUTH_LOCKOUT_MINUTES";
+
+    /// <summary>Activa o desactiva el limitador de peticiones.</summary>
+    public const string RateLimitEnabled = "RATE_LIMIT_ENABLED";
+
+    /// <summary>Peticiones por ventana y usuario en los endpoints de negocio.</summary>
+    public const string RateLimitPermitLimit = "RATE_LIMIT_PERMIT_LIMIT";
+
+    /// <summary>Duración en segundos de la ventana de los endpoints de negocio.</summary>
+    public const string RateLimitWindowSeconds = "RATE_LIMIT_WINDOW_SECONDS";
+
+    /// <summary>Peticiones por ventana e IP en inicio de sesión y registro.</summary>
+    public const string RateLimitAuthPermitLimit = "RATE_LIMIT_AUTH_PERMIT_LIMIT";
+
+    /// <summary>Duración en segundos de la ventana de inicio de sesión y registro.</summary>
+    public const string RateLimitAuthWindowSeconds = "RATE_LIMIT_AUTH_WINDOW_SECONDS";
+
+    /// <summary>Horas durante las que una clave de idempotencia reproduce su respuesta.</summary>
+    public const string IdempotencyKeyTtlHours = "IDEMPOTENCY_KEY_TTL_HOURS";
+
+    /// <summary>Minutos entre limpiezas de sesiones vencidas y claves de idempotencia caducadas. Cero la desactiva.</summary>
+    public const string PurgeIntervalMinutes = "PURGE_INTERVAL_MINUTES";
+
+    /// <summary>
+    /// Origen público de la web (<c>https://app.criba.gt</c>), para los enlaces que la API
+    /// entrega, como el del formulario de postulación. Sin él, esos enlaces van vacíos.
+    /// </summary>
+    public const string AppPublicUrl = "APP_PUBLIC_URL";
+
 }

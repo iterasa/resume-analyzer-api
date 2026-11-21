@@ -100,6 +100,10 @@ internal sealed class KeyRingCache(IKeyRingSource source, TimeProvider clock) {
         return GetAsync(scopeId, CancellationToken.None).AsTask().GetAwaiter().GetResult();
     }
 
+    /// <summary>Indica si el anillo del ámbito ya está cargado y vigente: pedirlo no consultará nada.</summary>
+    public bool IsLoaded(Guid scopeId) =>
+        entries.TryGetValue(scopeId, out var entry) && IsFresh(entry) && entry.Ring.IsValueCreated && entry.Ring.Value.IsCompletedSuccessfully;
+
     /// <summary>Olvida el anillo de un ámbito (tras provisionar o rotar sus llaves).</summary>
     public void Invalidate(Guid scopeId) => entries.TryRemove(scopeId, out _);
 

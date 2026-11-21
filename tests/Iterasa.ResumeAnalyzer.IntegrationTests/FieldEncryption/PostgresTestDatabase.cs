@@ -79,7 +79,7 @@ internal sealed class PostgresTestDatabase : IAsyncDisposable {
             .UseNpgsql(ConnectionString)
             .ConfigureWarnings(warnings => warnings.Ignore(CoreEventId.ManyServiceProvidersCreatedWarning)));
         services.AddScoped<UserRepository>();
-        services.AddScoped<UserQueries>();
+        services.AddScoped<SessionQueries>();
         var provider = services.BuildServiceProvider();
         providers.Add(provider);
         return provider;

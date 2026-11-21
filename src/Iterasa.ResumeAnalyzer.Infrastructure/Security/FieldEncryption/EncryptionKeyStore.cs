@@ -93,7 +93,7 @@ internal sealed partial class DatabaseKeyRingSource(
         }
 
         if (records.Count == 0) {
-            throw new InvalidOperationException($"Crypto scope {scopeId} has no encryption keys. Tenant keys are created with the tenant.");
+            throw new MissingCryptoScopeKeysException(scopeId);
         }
 
         var keys = new List<KeyMaterial>(records.Count);
@@ -136,5 +136,14 @@ internal sealed partial class DatabaseKeyRingSource(
 
     [LoggerMessage(EventId = 9100, Level = LogLevel.Information, Message = "Platform encryption keys created")]
     private static partial void LogPlatformKeysCreated(ILogger logger);
+
+}
+
+/// <summary>Un ámbito sin llaves: una empresa que no se provisionó (o que aún no se ha guardado).</summary>
+internal sealed class MissingCryptoScopeKeysException(Guid scopeId)
+    : InvalidOperationException($"Crypto scope {scopeId} has no encryption keys. Tenant keys are created with the tenant.") {
+
+    /// <summary>Ámbito sin llaves.</summary>
+    public Guid ScopeId { get; } = scopeId;
 
 }
