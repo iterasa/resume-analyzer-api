@@ -3,6 +3,7 @@ using Iterasa.ResumeAnalyzer.Api.Http;
 using Iterasa.ResumeAnalyzer.Api.Logging;
 using Iterasa.ResumeAnalyzer.Api.OpenApi;
 using Iterasa.ResumeAnalyzer.Api.Problems;
+using Iterasa.ResumeAnalyzer.Api.Security;
 using Microsoft.AspNetCore.Mvc.Formatters;
 using Microsoft.Extensions.DependencyInjection;
 using System.Diagnostics;
@@ -81,6 +82,7 @@ public static class DependencyInjection {
         services.AddHealthChecks();
         services.AddConfiguredForwardedHeaders();
         services.AddConfiguredCors();
+        services.AddConfiguredAuthentication();
 
         return services;
 

@@ -1,5 +1,6 @@
 using Iterasa.ResumeAnalyzer.Domain.Users;
 using Iterasa.ResumeAnalyzer.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
@@ -51,6 +52,12 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program> {
             connection = new SqliteConnection("DataSource=:memory:");
             connection.Open();
 
+            // La API exige sesión (ADR 0016). Las pruebas se autentican con una cabecera que
+            // los clientes de la factory envían por defecto; el desafío (401) sigue siendo el
+            // de producción.
+            services.AddAuthentication().AddScheme<AuthenticationSchemeOptions, TestAuthenticationHandler>(TestAuthenticationHandler.SchemeName, configureOptions: null);
+            services.PostConfigure<AuthenticationOptions>(options => options.DefaultAuthenticateScheme = TestAuthenticationHandler.SchemeName);
+
             // Cada factory es una aplicación con su propio cifrado de campos: EF crea un proveedor
             // interno por cada una, y en la suite completa pasan de veinte (ver PostgresTestDatabase).
             services.AddDbContext<AppDbContext>(options => options
@@ -59,6 +66,19 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program> {
 
         });
 
+    }
+
+    /// <summary>Los clientes actúan como <see cref="TestAuthenticationHandler.DefaultUserId" />.</summary>
+    protected override void ConfigureClient(HttpClient client) {
+        base.ConfigureClient(client);
+        client.DefaultRequestHeaders.Add(TestAuthenticationHandler.Header, TestAuthenticationHandler.DefaultUserId.ToString());
+    }
+
+    /// <summary>Un cliente sin sesión, como el de alguien que no ha iniciado sesión.</summary>
+    public HttpClient CreateAnonymousClient() {
+        var client = CreateClient();
+        client.DefaultRequestHeaders.Remove(TestAuthenticationHandler.Header);
+        return client;
     }
 
     protected override IHost CreateHost(IHostBuilder builder) {

@@ -83,6 +83,24 @@ public sealed class ConventionRulesTests {
 
     }
 
+    /// <remarks>
+    /// La API está cerrada por defecto (ADR 0016). Abrir una acción de un controller es una
+    /// decisión de seguridad que no puede colarse con un atributo: si hace falta, se cambia
+    /// esta regla en el mismo PR, a la vista de quien revisa.
+    /// </remarks>
+    [Fact]
+    public void Controllers_Should_Not_Allow_Anonymous_Access() {
+
+        var anonymous = ApiAssembly.GetTypes()
+            .Where(type => type.Namespace == "Iterasa.ResumeAnalyzer.Api.Controllers")
+            .SelectMany(type => type.GetMethods().Cast<System.Reflection.MemberInfo>().Prepend(type))
+            .Where(member => member.IsDefined(typeof(Microsoft.AspNetCore.Authorization.AllowAnonymousAttribute), inherit: true))
+            .Select(member => $"{member.DeclaringType?.Name}.{member.Name}");
+
+        anonymous.Should().BeEmpty();
+
+    }
+
     [Fact]
     public void Domain_Should_Depend_On_Nothing_But_The_Base_Library_And_Shared() {
 

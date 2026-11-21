@@ -74,7 +74,8 @@ internal static class OpenApiExtensions {
             return app;
         }
 
-        app.MapOpenApi(DocumentRoute).WithDocumentPerVersion();
+        // Anónimo a propósito: solo se publica con SWAGGER_ENABLED (apagado en la imagen).
+        app.MapOpenApi(DocumentRoute).WithDocumentPerVersion().AllowAnonymous();
 
         var versions = app.Services.GetRequiredService<IApiVersionDescriptionProvider>().ApiVersionDescriptions;
 

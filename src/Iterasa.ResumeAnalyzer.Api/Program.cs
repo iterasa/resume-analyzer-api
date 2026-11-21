@@ -62,6 +62,11 @@ try {
     // también en las respuestas de error. Sin política activa no añade nada.
     app.UseConfiguredCors();
 
+    // Después de CORS (un preflight no lleva credenciales) y antes de los endpoints: toda ruta
+    // exige sesión salvo las declaradas anónimas (ADR 0016).
+    app.UseAuthentication();
+    app.UseAuthorization();
+
     app.MapControllers();
     app.MapHealthEndpoints();
 
