@@ -1,0 +1,110 @@
+name: Commit Lint
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+  push:
+    branches-ignore:
+      - main
+      - master
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  pr-title:
+    name: Validate PR title (Conventional Commits)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      # Fijada por SHA: una etiqueta se puede mover. Dependabot propone las subidas.
+      - uses: amannn/action-semantic-pull-request@0723387faaf9b38adef4775cd42cfd5155ed6017 # v5.5.3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          types: |
+            feat
+            fix
+            docs
+            style
+            refactor
+            perf
+            test
+            build
+            ci
+            chore
+            revert
+          requireScope: false
+          subjectPattern: ^[a-z0-9].+$
+          subjectPatternError: |
+            La descripción debe empezar en minúscula y no estar vacía.
+            Ejemplo: feat(auth): add refresh-token rotation
+
+  commits:
+    name: Validate commit messages
+    runs-on: ubuntu-latest
+    env:
+      # Fecha de adopción del estándar en este repo (ISO 8601).
+      # Commits anteriores a esta fecha NO se validan (grace period para historia legacy).
+      # Ajusta aquí si cambias de política.
+      COMMIT_LINT_SINCE: "2026-10-08"
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+          # El job solo lee el historial: el token no tiene por qué quedarse en .git/config.
+          persist-credentials: false
+
+      - name: Validate each commit in branch
+        # Por variables de entorno y no interpoladas en el script, como en template-cleanup.
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          set -e
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            RANGE="origin/${BASE_REF}..HEAD"
+          else
+            RANGE="origin/main..HEAD"
+          fi
+
+          PATTERN='^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([a-zA-Z0-9_./-]+\))?!?: .{1,}$'
+          FAIL=0
+          SKIPPED=0
+
+          # SHAs anteriores a COMMIT_LINT_SINCE (grace period)
+          SKIP_SHAS=$(git log --before="$COMMIT_LINT_SINCE" --format=%H 2>/dev/null | sort -u)
+
+          while IFS= read -r sha; do
+            [ -z "$sha" ] && continue
+
+            # Grace: si el commit es anterior a la fecha de adopción, saltar
+            if echo "$SKIP_SHAS" | grep -q "^$sha$"; then
+              SKIPPED=$((SKIPPED+1))
+              continue
+            fi
+
+            msg=$(git log -1 --format=%s "$sha")
+            # permitir merge/revert/fixup
+            case "$msg" in
+              Merge*|Revert*|"fixup!"*|"squash!"*|"amend!"*) continue ;;
+            esac
+            if ! echo "$msg" | grep -Eq "$PATTERN"; then
+              echo "::error::Commit $sha no cumple Conventional Commits:"
+              echo "::error::  $msg"
+              FAIL=1
+            fi
+          done < <(git rev-list "$RANGE" 2>/dev/null || git rev-list HEAD -n 20)
+
+          echo ""
+          [ "$SKIPPED" -gt 0 ] && echo "ℹ️  $SKIPPED commit(s) ignorados por grace period (antes de $COMMIT_LINT_SINCE)"
+
+          if [ "$FAIL" -eq 1 ]; then
+            echo ""
+            echo "Formato: <type>[(scope)][!]: <descripción>"
+            echo "Tipos: feat fix docs style refactor perf test build ci chore revert"
+            echo "Más info: https://www.conventionalcommits.org/"
+            exit 1
+          fi
+          echo "✅ Todos los commits (post-adopción) cumplen Conventional Commits"

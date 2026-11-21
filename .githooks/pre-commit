@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+#
+# Pre-commit: secretos y formato sobre lo que se va a confirmar.
+#
+# Sin dependencias más allá de bash, gitleaks y el SDK de .NET. Se activa una vez por
+# clon con `git config core.hooksPath .githooks`. Es una red
+# local: lo que de verdad bloquea es el mismo par de comprobaciones en el CI. Saltarlo,
+# cuando haga falta a sabiendas: `git commit --no-verify`.
+#
+set -euo pipefail
+
+cd "$(git rev-parse --show-toplevel)"
+
+# --- 1. Secretos ---------------------------------------------------------------------
+if ! command -v gitleaks >/dev/null 2>&1; then
+  cat >&2 <<'MSG'
+pre-commit: falta gitleaks. Instálalo (brew install gitleaks | https://github.com/gitleaks/gitleaks#installing)
+o, si ya sabes lo que haces, confirma con `git commit --no-verify`.
+MSG
+  exit 1
+fi
+
+# `gitleaks git --pre-commit --staged` existe desde 8.19; antes era `protect --staged`.
+if gitleaks git --help >/dev/null 2>&1; then
+  gitleaks git --pre-commit --staged --redact --no-banner
+else
+  gitleaks protect --staged --redact --no-banner
+fi
+
+# --- 2. Formato de los .cs que entran en el commit ------------------------------------
+# Separados por NUL y en un array: una ruta con espacios o comodines llega entera.
+# Sin mapfile, que no existe en el bash 3.2 de macOS.
+staged_cs=()
+while IFS= read -r -d '' path; do
+  staged_cs+=("$path")
+done < <(git diff --cached --name-only -z --diff-filter=ACMR -- '*.cs')
+
+if [ "${#staged_cs[@]}" -gt 0 ]; then
+  solution=$(ls ./*.sln | head -n 1)
+  if ! dotnet format "$solution" --verify-no-changes --no-restore --include "${staged_cs[@]}"; then
+    echo >&2
+    echo "pre-commit: hay ficheros sin formatear. Ejecuta \`dotnet format\` y vuelve a añadirlos." >&2
+    exit 1
+  fi
+fi

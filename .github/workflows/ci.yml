@@ -1,0 +1,70 @@
+# Lo que bloquea de verdad (ADR 0014): secretos, formato, compilación y pruebas en cada PR
+# y en cada push a main. .githooks/pre-commit es la misma red, pero local y saltable.
+#
+# Este fichero no debe contener el nombre de la plantilla: el renombrado lo modificaría,
+# y GitHub no deja que el GITHUB_TOKEN de template-cleanup.yml modifique workflows.
+# scripts/verify-template.sh lo comprueba.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  secrets:
+    name: Secretos (gitleaks)
+    runs-on: ubuntu-latest
+    env:
+      GITLEAKS_VERSION: 8.30.1
+      # SHA-256 de gitleaks_8.30.1_linux_x64.tar.gz, el mismo que publica el checksums.txt
+      # de la release. Al subir de versión hay que cambiar los dos valores.
+      GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          # Todo el historial: un secreto añadido y borrado en el mismo PR también cuenta.
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Instalar gitleaks
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/gitleaks.tar.gz" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  $RUNNER_TEMP/gitleaks.tar.gz" | sha256sum --check --strict
+          tar -xzf "$RUNNER_TEMP/gitleaks.tar.gz" -C "$RUNNER_TEMP" gitleaks
+
+      - name: Buscar secretos en el historial
+        run: '"$RUNNER_TEMP/gitleaks" git --redact --no-banner --verbose .'
+
+  build:
+    name: Formato, compilación y pruebas
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          # La misma banda que global.json (10.0.x, rollForward latestFeature).
+          dotnet-version: 10.0.x
+
+      - name: Restaurar
+        run: dotnet restore
+
+      - name: Formato
+        run: dotnet format --verify-no-changes --no-restore
+
+      - name: Compilar
+        run: dotnet build --no-restore -c Release
+
+      - name: Pruebas
+        run: dotnet test --no-build -c Release

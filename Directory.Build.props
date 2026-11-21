@@ -1,0 +1,13 @@
+<Project>
+  <PropertyGroup>
+    <NetTargetFramework>net10.0</NetTargetFramework>
+    <TargetFramework>$(NetTargetFramework)</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <AnalysisLevel>latest</AnalysisLevel>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+</Project>

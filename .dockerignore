@@ -1,0 +1,22 @@
+# Salidas de compilación a cualquier profundidad: el COPY . . del Dockerfile no debe
+# pisar el obj/ restaurado en la imagen con el del host.
+**/bin/
+**/obj/
+**/TestResults/
+.vs/
+.idea/
+.git/
+.gitignore
+coverage/
+artifacts/
+
+# Configuración local y secretos: nunca entran en el contexto de build.
+**/.env
+**/.env.*
+**/*.env
+**/appsettings*.json
+**/launchSettings.json
+**/*.pfx
+**/*.p12
+**/*.pem
+**/*.key

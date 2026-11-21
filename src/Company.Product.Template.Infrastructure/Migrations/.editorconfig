@@ -1,0 +1,5 @@
+# Las migraciones las genera EF Core: no se les aplican las reglas de estilo del repo.
+[*.cs]
+generated_code = true
+dotnet_analyzer_diagnostic.severity = none
+dotnet_diagnostic.IDE0161.severity = none

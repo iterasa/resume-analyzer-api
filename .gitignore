@@ -1,0 +1,58 @@
+.claude
+Claude.md
+AGENTS.md
+
+# Environment variables
+.env
+.env.*
+!.env.example
+*.env
+
+# Certificates and private keys
+*.pfx
+*.p12
+*.pem
+*.key
+
+# Configuration files - use .env instead
+appsettings.json
+appsettings.*.json
+
+# Build results
+bin/
+obj/
+out/
+
+# User-specific files
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# VS Code
+launchSettings.json
+.vscode/
+*.code-workspace
+
+# Rider
+.idea/
+*.sln.iml
+
+# Visual Studio
+.vs/
+
+# MacOS
+.DS_Store
+
+# Logs
+logs/
+*.log
+
+# Database
+*.db
+*.db-shm
+*.db-wal
+
+# Temporary files
+*.tmp
+*.temp

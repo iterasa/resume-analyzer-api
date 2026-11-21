@@ -1,0 +1,43 @@
+# Subidas de dependencias, imágenes base y acciones. Los mensajes siguen Conventional
+# Commits para que pasen commit-lint.yml.
+version: 2
+
+updates:
+  - package-ecosystem: nuget
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: build
+      include: scope
+    groups:
+      nuget:
+        patterns: ["*"]
+        update-types: [minor, patch]
+    ignore:
+      # Las versiones mayores van con el TargetFramework y se suben a mano. FluentAssertions
+      # 8 cambió a licencia comercial (ver Directory.Packages.props).
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: build
+      include: scope
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: ci
+      include: scope
+    groups:
+      actions:
+        patterns: ["*"]
