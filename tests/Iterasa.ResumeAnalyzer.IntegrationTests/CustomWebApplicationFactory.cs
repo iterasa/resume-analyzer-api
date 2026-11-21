@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
@@ -31,6 +32,9 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program> {
         Environment.SetEnvironmentVariable("DATABASE_CONNECTION_STRING", "Host=127.0.0.1;Port=1;Database=test_db;Username=test;Password=test;Timeout=2");
         Environment.SetEnvironmentVariable("LOG_LEVEL", "Warning");
         Environment.SetEnvironmentVariable("SWAGGER_ENABLED", "false");
+        // Llave maestra local: el entorno «Testing» la admite; producción no arranca con ella.
+        Environment.SetEnvironmentVariable("FIELD_ENCRYPTION_KEK_PROVIDER", "local");
+        Environment.SetEnvironmentVariable("FIELD_ENCRYPTION_LOCAL_KEK", TestKeys.LocalKek);
 
         builder.UseEnvironment("Testing");
 
@@ -47,7 +51,11 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program> {
             connection = new SqliteConnection("DataSource=:memory:");
             connection.Open();
 
-            services.AddDbContext<AppDbContext>(options => options.UseSqlite(connection));
+            // Cada factory es una aplicación con su propio cifrado de campos: EF crea un proveedor
+            // interno por cada una, y en la suite completa pasan de veinte (ver PostgresTestDatabase).
+            services.AddDbContext<AppDbContext>(options => options
+                .UseSqlite(connection)
+                .ConfigureWarnings(warnings => warnings.Ignore(CoreEventId.ManyServiceProvidersCreatedWarning)));
 
         });
 

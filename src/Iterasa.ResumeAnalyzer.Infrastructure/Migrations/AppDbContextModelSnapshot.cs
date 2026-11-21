@@ -71,6 +71,77 @@ namespace Iterasa.ResumeAnalyzer.Infrastructure.Migrations
                     b.ToTable("user", (string)null);
                 });
 
+            modelBuilder.Entity("Iterasa.ResumeAnalyzer.Infrastructure.Security.FieldEncryption.EncryptionKeyRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("KekId")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)")
+                        .HasColumnName("kek_id");
+
+                    b.Property<string>("KeyId")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("key_id");
+
+                    b.Property<string>("Purpose")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("purpose");
+
+                    b.Property<Guid>("ScopeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("scope_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset>("StatusChangedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("status_changed_at_utc");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.Property<string>("WrappedKey")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("wrapped_key");
+
+                    b.HasKey("Id")
+                        .HasName("pk_encryption_key");
+
+                    b.HasIndex("KeyId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_encryption_key_key_id");
+
+                    b.HasIndex("ScopeId", "Purpose")
+                        .IsUnique()
+                        .HasDatabaseName("ix_encryption_key_one_active")
+                        .HasFilter("status = 'active'");
+
+                    b.HasIndex("ScopeId", "Purpose", "Version")
+                        .IsUnique()
+                        .HasDatabaseName("ix_encryption_key_scope_purpose_version");
+
+                    b.ToTable("encryption_key", (string)null);
+                });
+
             modelBuilder.Entity("Iterasa.ResumeAnalyzer.Domain.Users.User", b =>
                 {
                     b.OwnsOne("Iterasa.ResumeAnalyzer.Domain.ValueObjects.Email", "Email", b1 =>
@@ -78,17 +149,26 @@ namespace Iterasa.ResumeAnalyzer.Infrastructure.Migrations
                             b1.Property<Guid>("UserId")
                                 .HasColumnType("uuid");
 
+                            b1.Property<byte[]>("EmailBidx")
+                                .IsRequired()
+                                .HasColumnType("bytea")
+                                .HasColumnName("email_bidx");
+
+                            b1.Property<int>("EmailBidxVersion")
+                                .HasColumnType("integer")
+                                .HasColumnName("email_bidx_v");
+
                             b1.Property<string>("Value")
                                 .IsRequired()
-                                .HasMaxLength(256)
-                                .HasColumnType("character varying(256)")
-                                .HasColumnName("email");
+                                .HasColumnType("text")
+                                .HasColumnName("email")
+                                .HasAnnotation("Iterasa:EncryptedField", "user.email");
 
                             b1.HasKey("UserId");
 
-                            b1.HasIndex("Value")
+                            b1.HasIndex("EmailBidx")
                                 .IsUnique()
-                                .HasDatabaseName("ix_user_email");
+                                .HasDatabaseName("ix_user_email_bidx");
 
                             b1.ToTable("user");
 

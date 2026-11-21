@@ -1,3 +1,4 @@
+using Iterasa.ResumeAnalyzer.Infrastructure.Security.FieldEncryption;
 using Iterasa.ResumeAnalyzer.Shared.Configuration;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
@@ -20,7 +21,8 @@ internal sealed class AppDbContextFactory : IDesignTimeDbContextFactory<AppDbCon
             .UseNpgsql(connectionString)
             .Options;
 
-        return new AppDbContext(options);
+        // Sin llaves ni interceptores: las migraciones solo necesitan el modelo.
+        return new AppDbContext(options, EfFieldEncryption.DesignTime);
 
     }
 

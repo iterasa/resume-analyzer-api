@@ -43,6 +43,22 @@ jobs:
   build:
     name: Formato, compilación y pruebas
     runs-on: ubuntu-latest
+    # PostgreSQL desechable para las pruebas del cifrado de campos (ADR 0015): cada prueba
+    # crea y borra su propia base. Sin él, esas pruebas fallan a propósito.
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_POSTGRES_ADMIN_CONNECTION_STRING: Host=127.0.0.1;Port=5432;Username=postgres;Database=postgres
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:

@@ -57,4 +57,16 @@ public static class EnvironmentVariables {
     /// <summary>Redes CIDR de confianza (por ejemplo <c>10.0.0.0/8</c>), separadas por comas.</summary>
     public const string ForwardedHeadersKnownNetworks = "FORWARDED_HEADERS_KNOWN_NETWORKS";
 
+    /// <summary>
+    /// Llave maestra del cifrado de campos: <c>aws-kms</c> o <c>local</c> (solo desarrollo y
+    /// pruebas). Obligatoria.
+    /// </summary>
+    public const string FieldEncryptionKekProvider = "FIELD_ENCRYPTION_KEK_PROVIDER";
+
+    /// <summary>Id, ARN o alias de la llave de AWS KMS que envuelve las llaves de datos.</summary>
+    public const string FieldEncryptionKmsKeyId = "FIELD_ENCRYPTION_KMS_KEY_ID";
+
+    /// <summary>Llave maestra local: 32 bytes en base64. Nunca en producción.</summary>
+    public const string FieldEncryptionLocalKek = "FIELD_ENCRYPTION_LOCAL_KEK";
+
 }

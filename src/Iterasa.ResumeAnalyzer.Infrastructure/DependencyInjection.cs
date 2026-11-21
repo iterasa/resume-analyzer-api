@@ -1,6 +1,7 @@
 using Iterasa.ResumeAnalyzer.Application.Abstractions;
 using Iterasa.ResumeAnalyzer.Infrastructure.Health;
 using Iterasa.ResumeAnalyzer.Infrastructure.Persistence;
+using Iterasa.ResumeAnalyzer.Infrastructure.Security.FieldEncryption;
 using Iterasa.ResumeAnalyzer.Infrastructure.Web;
 using Iterasa.ResumeAnalyzer.Shared.Configuration;
 using Microsoft.EntityFrameworkCore;
@@ -14,7 +15,7 @@ namespace Iterasa.ResumeAnalyzer.Infrastructure;
 public static class DependencyInjection {
 
     /// <summary>
-    /// Registra los servicios de infraestructura: persistencia y health checks.
+    /// Registra los servicios de infraestructura: persistencia, cifrado de campos y health checks.
     /// </summary>
     /// <param name="services">Colección de servicios.</param>
     /// <returns>La misma colección de servicios para encadenamiento.</returns>
@@ -22,6 +23,8 @@ public static class DependencyInjection {
 
         services.AddDbContext<AppDbContext>((provider, options) =>
             options.UseNpgsql(EnvironmentVariableReader.GetRequired(EnvironmentVariables.DatabaseConnectionString)));
+
+        services.AddFieldEncryption();
 
         services.AddScoped<ICurrentPrincipal, CurrentPrincipal>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();

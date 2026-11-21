@@ -39,6 +39,19 @@ public sealed class UserEndpointTests(CustomWebApplicationFactory factory) : ICl
 
     }
 
+    /// <remarks>
+    /// El correo está cifrado: el duplicado se detecta por su índice ciego, que normaliza
+    /// mayúsculas y espacios.
+    /// </remarks>
+    [Fact]
+    public async Task A_Duplicate_Email_In_Another_Case_Should_Conflict() {
+
+        var response = await factory.CreateClient().PostAsJsonAsync("/api/v1/users", new { username = "email-twin", email = "  USER@Example.TEST " });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+
+    }
+
     [Fact]
     public async Task A_Duplicate_Username_Should_Conflict() {
 

@@ -1,5 +1,6 @@
 using Iterasa.ResumeAnalyzer.Application.Abstractions;
 using Iterasa.ResumeAnalyzer.Domain.Users;
+using Iterasa.ResumeAnalyzer.Infrastructure.Security.FieldEncryption;
 using Microsoft.EntityFrameworkCore;
 
 namespace Iterasa.ResumeAnalyzer.Infrastructure.Persistence;
@@ -7,15 +8,20 @@ namespace Iterasa.ResumeAnalyzer.Infrastructure.Persistence;
 /// <summary>
 /// Lado de escritura del aggregate User.
 /// </summary>
-internal sealed class UserRepository(AppDbContext dbContext) : IUserRepository {
+internal sealed class UserRepository(AppDbContext dbContext, BlindIndexer blindIndexer) : IUserRepository {
 
     /// <inheritdoc />
     public void Add(User user) => dbContext.Users.Add(user);
 
     /// <inheritdoc />
+    /// <remarks>
+    /// El correo está cifrado: se busca por su índice ciego, con cada versión vigente de la llave.
+    /// </remarks>
     public async Task<bool> ExistsWithEmailAsync(string email, CancellationToken cancellationToken = default) {
-        var normalized = email.Trim().ToLowerInvariant();
-        return await dbContext.Users.AnyAsync(u => u.Email.Value == normalized, cancellationToken);
+        var hashes = await blindIndexer.ComputeForLookupAsync(EncryptedFields.UserEmail, CryptoScopes.Platform, email, cancellationToken);
+        return await dbContext.Users.AnyAsync(
+            u => hashes.Contains(EF.Property<byte[]>(u.Email, EncryptedFields.UserEmail.BlindIndexProperty)),
+            cancellationToken);
     }
 
     /// <inheritdoc />

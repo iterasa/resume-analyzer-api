@@ -1,5 +1,5 @@
 using Iterasa.ResumeAnalyzer.Domain.Users;
-using Iterasa.ResumeAnalyzer.Domain.ValueObjects;
+using Iterasa.ResumeAnalyzer.Infrastructure.Security.FieldEncryption;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -20,9 +20,10 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User> {
         builder.Property(u => u.Username).HasColumnName("username").HasMaxLength(User.MaxUsernameLength).IsRequired();
         builder.HasIndex(u => u.Username).IsUnique().HasDatabaseName("ix_user_username");
 
+        // Cifrado y sin límite de longitud en la columna: el límite lo valida el dominio sobre el
+        // texto. La unicidad la impone el índice ciego (ix_user_email_bidx), no la columna.
         builder.OwnsOne(u => u.Email, email => {
-            email.Property(e => e.Value).HasColumnName("email").HasMaxLength(Email.MaxLength).IsRequired();
-            email.HasIndex(e => e.Value).IsUnique().HasDatabaseName("ix_user_email");
+            email.Property(e => e.Value).HasColumnName("email").IsRequired().IsEncrypted(EncryptedFields.UserEmail);
         });
 
         builder.ConfigureAuditColumns();
