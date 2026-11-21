@@ -95,3 +95,23 @@ migrar. En un entorno con datos reales hay que hacer una migración dual:
 4. retirar la lectura en claro.
 
 Este proyecto no la necesitó: no había datos.
+
+## Llaves de Data Protection (antiforgery)
+
+Las llaves que firman los tokens antiforgery viven en `data_protection_key`, con el XML cifrado
+con las llaves de plataforma (ADR 0017). ASP.NET crea una nueva cada 90 días y conserva las
+anteriores para validar los tokens ya emitidos.
+
+- Al crear una, Data Protection registra *«No XML encryptor configured»*: es esperado, el
+  cifrado lo hace la columna, no Data Protection.
+- **Llave comprometida**: borrar las filas de `data_protection_key` y reiniciar las instancias.
+  Se crea otra al primer uso; los tokens emitidos dejan de valer y la web pide uno nuevo sola
+  (`antiforgery_invalid` → reintento). Las sesiones no se ven afectadas: no dependen de estas llaves.
+- **Restauración**: si la KEK o la llave de plataforma no corresponden, el XML no descifra y la
+  API no puede emitir tokens. Mismo remedio: borrar las filas.
+
+## Usuarios existentes antes de `TenantsSessionsVacancies`
+
+Igual que la migración del cifrado, `20261121214257_TenantsSessionsVacancies` se detiene si
+`user` tiene filas: el nombre nuevo va cifrado y solo lo cifra la aplicación. Si llegara a haber
+usuarios, se recrean con el registro (no había datos reales al escribirla).

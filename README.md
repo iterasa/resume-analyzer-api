@@ -20,6 +20,9 @@ Proveer una base consistente y mantenible para desarrollo de APIs backend, reduc
 | Base de datos   | PostgreSQL (Npgsql)               |
 | Documentación   | OpenAPI nativo (`Microsoft.AspNetCore.OpenApi`) + Swagger UI |
 | Versionado      | URL Path Versioning               |
+| Sesión          | Cookie `HttpOnly` con token opaco validado en PostgreSQL + antiforgery |
+| Contraseñas     | Argon2id (`Konscious.Security.Cryptography.Argon2`) |
+| Caché           | `HybridCache` (memoria local)     |
 | Logging         | Serilog (structured logging JSON) |
 | Testing         | xUnit + FluentAssertions          |
 | Arquitectura    | NetArchTest                       |
@@ -60,11 +63,12 @@ tests/
 ## 🧭 Cómo está organizado el código
 
 ```
-Api            controllers, contratos HTTP, Problem Details, OpenAPI, CORS, logging
-Application    casos de uso (un handler por operación), puertos (Abstractions/), auditoría
-Domain         agregados, entidades, value objects, invariantes. Sin dependencias
-Infrastructure EF Core, health checks. Implementa los puertos
-Shared         Result/Error, DomainException, paginación, lectura de variables
+Api            controllers, contratos HTTP, sesión (cookie), antiforgery, permisos,
+               idempotencia, límites de peticiones, Problem Details, OpenAPI, CORS, logging
+Application    casos de uso por feature (Auth, Me, Vacancies), puertos (Abstractions/), auditoría
+Domain         agregados (User, Tenant, Membership, Vacancy), value objects, invariantes
+Infrastructure EF Core, sesiones, contraseñas, cifrado de campos, caché, empresa por petición
+Shared         Result/Error, permisos y roles, vocabulario (enums del contrato), paginación, variables
 ```
 
 La regla de dependencia la vigilan los tests de arquitectura: `Api` no puede ver `Domain`
@@ -84,32 +88,35 @@ rompería sin que ningún test funcional lo notara:
 
 ### Cómo añadir un caso de uso
 
-Ejemplo: «renombrar un usuario». Cuatro ficheros y un registro.
+Ejemplo: «cambiar la prioridad de una vacante». Cuatro ficheros y un registro.
 
-1. **Dominio** — la regla vive en el agregado: se añade a `User` un verbo
-   `Rename(username, actorId, now)` que lance `DomainException` cuando se incumpla una
-   invariante. Todo verbo que deje marca temporal recibe el instante: el dominio no
+1. **Dominio** — la regla vive en el agregado: se añade a `Vacancy` un verbo
+   `ChangePriority(priority, actorId, now)` que lance `DomainException` cuando se incumpla
+   una invariante. Todo verbo que deje marca temporal recibe el instante: el dominio no
    consulta el reloj.
 
-2. **Aplicación** — carpeta `Features/Users/Commands/RenameUser/` con:
-   - `RenameUserCommand.cs` — `record RenameUserCommand(Guid UserId, string Username)`.
-   - `IRenameUserHandler.cs` — `Task<Result> Handle(RenameUserCommand, CancellationToken)`.
-   - `RenameUserHandler.cs` — carga con `IUserRepository.FindForUpdateAsync`, toma el
-     instante una vez (`clock.GetUtcNow()`, con `TimeProvider` inyectado), invoca el verbo
-     del agregado, confirma con `IUnitOfWork.SaveChangesAsync`, y registra con
-     `AuditLog.Succeeded` / `Rejected`. Devuelve `Result.Failure(Error.NotFound(...))`
-     para los fallos esperables; las invariantes las lanza el dominio y las traduce la API.
+2. **Aplicación** — carpeta `Features/Vacancies/Commands/ChangePriority/` con:
+   - `ChangePriorityCommand.cs` — `record ChangePriorityCommand(Guid VacancyId, Priority Priority)`.
+   - `IChangePriorityHandler.cs` — `Task<Result<VacancyDetail>> Handle(ChangePriorityCommand, CancellationToken)`.
+   - `ChangePriorityHandler.cs` — carga con `IVacancyRepository.FindForUpdateAsync` (ya
+     acotado a la empresa de la sesión), toma el instante una vez (`clock.GetUtcNow()`),
+     invoca el verbo, confirma con `IUnitOfWork.SaveChangesAsync` y registra con
+     `AuditLog.Succeeded` / `Rejected`. Devuelve `Result.Failure(...)` para los fallos
+     esperables; las invariantes las lanza el dominio y las traduce la API.
    - Registro en `Application/DependencyInjection.cs`.
 
-3. **API** — acción en `UsersController` con `return result.Match(NoContent, this.ToProblem);`.
+3. **API** — acción en `VacanciesController` con el permiso que exige
+   (`[Authorize(Policy = Permissions.VacanciesManage)]`), `[Idempotent]` si es un `POST`, y
+   `return result.Match(Ok, this.ToProblem);`.
 
-4. **Test** — uno de integración que llame al endpoint y compruebe el resultado y los
-   errores esperables.
+4. **Test** — uno de integración que llame al endpoint con una sesión real
+   (`factory.RegisterAsync()`) y compruebe el resultado, los errores esperables y que otra
+   empresa no lo ve.
 
-Lo que **no** hay que hacer: consultar desde un handler con `IUserQueries` para luego
-modificar (las queries devuelven proyecciones o agregados sin rastrear); poner `try/catch`
-de `DomainException` en el handler (lo hace el manejador global); ni devolver el agregado
-desde un controller (solo DTOs).
+Lo que **no** hay que hacer: consultar desde un handler con un `I…Queries` para luego
+modificar (las queries devuelven proyecciones sin rastrear); poner `try/catch` de
+`DomainException` en el handler (lo hace el manejador global); tomar el `TenantId` del cuerpo
+de la petición (sale de la sesión); ni devolver el agregado desde un controller (solo DTOs).
 
 ### Cómo añadir una consulta
 
@@ -145,6 +152,18 @@ La API se configura con **variables de entorno (.env)** en lugar de `appsettings
 | FORWARDED_HEADERS_ENABLED      | false      | Procesa `X-Forwarded-For` / `X-Forwarded-Proto` |
 | FORWARDED_HEADERS_KNOWN_PROXIES | —         | IPs de proxys de confianza, separadas por comas |
 | FORWARDED_HEADERS_KNOWN_NETWORKS | —        | Redes CIDR de confianza, separadas por comas |
+| APP_PUBLIC_URL                 | —          | Origen de la web (`https://app.criba.gt`), para el enlace del formulario de postulación. Sin él, `applyUrl` va nulo |
+| SESSION_IDLE_MINUTES           | 30         | Inactividad tras la que vence una sesión |
+| SESSION_ABSOLUTE_HOURS         | 12         | Vida máxima de una sesión desde el inicio de sesión |
+| AUTH_MAX_FAILED_SIGN_INS       | 5          | Intentos fallidos que bloquean la cuenta |
+| AUTH_LOCKOUT_MINUTES           | 15         | Duración del bloqueo |
+| PASSWORD_HASH_ALGORITHM        | argon2id   | `argon2id` o `pbkdf2-sha256` (FIPS). Los hashes existentes se rehacen al iniciar sesión |
+| ARGON2_MEMORY_KIB / ARGON2_ITERATIONS / ARGON2_PARALLELISM | 19456 / 2 / 1 | Parámetros de Argon2id (referencia OWASP) |
+| RATE_LIMIT_ENABLED             | true       | Limitador de peticiones |
+| RATE_LIMIT_PERMIT_LIMIT / RATE_LIMIT_WINDOW_SECONDS | 100 / 60 | Peticiones por usuario y ventana |
+| RATE_LIMIT_AUTH_PERMIT_LIMIT / RATE_LIMIT_AUTH_WINDOW_SECONDS | 10 / 60 | Inicio de sesión y registro, por IP y ventana |
+| IDEMPOTENCY_KEY_TTL_HOURS      | 24         | Tiempo que una `Idempotency-Key` reproduce su respuesta |
+| PURGE_INTERVAL_MINUTES         | 60         | Limpieza de sesiones vencidas y claves de idempotencia caducadas. `0` la desactiva |
 
 La configuración se valida al arrancar el host (`ValidateOnStart`): con variables
 ausentes o inválidas el proceso falla antes de aceptar tráfico. Las variables booleanas
@@ -267,9 +286,20 @@ UI (`/swagger`) es solo la interfaz; cualquier otra que lea el documento sirve i
 
 | Endpoint | Descripción |
 |---------|-------------|
-| `GET /users`, `GET /users/{id}` | Listado paginado y detalle |
-| `POST /users` | Alta |
-| `DELETE /users/{id}`, `POST /users/{id}/activation` | Baja y alta lógica |
+| `GET /antiforgery/token` | Token CSRF en la cookie `XSRF-TOKEN` (anónimo) |
+| `POST /auth/register`, `POST /auth/login` | Alta de empresa e inicio de sesión (anónimos, limitados por IP) |
+| `POST /auth/logout`, `POST /auth/switch-tenant` | Cierre de sesión y cambio de empresa |
+| `GET /me` | Sesión: usuario, empresa, membresías, rol, permisos y evaluación anónima |
+| `GET /vacancies?status=`, `GET /vacancies/{id}`, `GET /vacancies/owner-options` | Listado, detalle y responsables posibles |
+| `POST /vacancies`, `PUT /vacancies/{id}`, `PUT /vacancies/{id}/requirements` | Alta y edición (`vacancies.manage`) |
+| `POST /vacancies/{id}/close` · `reopen` · `pause` · `resume` | Ciclo de vida (`vacancies.manage`, auditado) |
+
+Las rutas son las del contrato de la web (`docs/contrato-api.md` del frontend). Diferencias:
+`whatsappLink` va nulo mientras no exista WhatsApp, y los conteos de CV van a cero hasta que
+existan las postulaciones.
+
+Los `POST` que crean o cambian de estado aceptan `Idempotency-Key` ([ADR 0007](docs/adr/0007-idempotencia-transaccional.md)):
+un reintento con la misma clave recibe la misma respuesta, marcada con `Idempotency-Replayed: true`.
 
 Los listados aceptan `?page=` y `?pageSize=` y devuelven `items`, `page`, `pageSize`,
 `totalCount`, `totalPages` y `hasNextPage`. Los valores fuera de rango se ajustan en
@@ -328,12 +358,12 @@ docker buildx build --platform linux/amd64,linux/arm64 -t registry/api:1.2.3 --p
 | Tipo               | Descripción |
 |-------------------|------------|
 | Unit Tests         | Dominio y lógica pura |
-| Integration Tests  | API real con WebApplicationFactory sobre SQLite en memoria. El cifrado de campos se prueba contra PostgreSQL real (ver abajo) |
+| Integration Tests  | API real con WebApplicationFactory sobre SQLite en memoria, con sesiones de verdad: cada prueba registra su empresa y sigue con su cookie y su token antiforgery, como la web. El cifrado de campos y un recorrido completo se prueban contra PostgreSQL real (ver abajo) |
 | Architecture Tests | Dependencias entre capas y convenciones (reloj, handlers, controllers) |
 
 ### PostgreSQL para las pruebas de cifrado
 
-Las pruebas del cifrado de campos (`IntegrationTests/FieldEncryption`) corren contra un
+Las pruebas del cifrado de campos y el recorrido completo (`IntegrationTests/FieldEncryption`) corren contra un
 PostgreSQL de verdad: cada una crea su propia base vacía, le aplica las migraciones y la
 borra al terminar. Sin servidor **fallan**, no se saltan. Basta uno desechable:
 
@@ -400,12 +430,27 @@ dotnet run --project src/Iterasa.ResumeAnalyzer.Api
 
 ---
 
-## 🔒 Autenticación
+## 🔒 Autenticación y empresas
 
-La API está **cerrada por defecto**: toda ruta exige sesión salvo `/health*` y el documento
-OpenAPI. Mientras no exista el inicio de sesión, cualquier otra ruta responde `401`. Ningún
-controller puede declararse anónimo (lo vigila una prueba de arquitectura). Ver
-[ADR 0016](docs/adr/0016-api-cerrada-por-defecto.md).
+La API está **cerrada por defecto**: toda ruta exige sesión salvo `/health*`, el documento
+OpenAPI y tres acciones anónimas (token antiforgery, registro e inicio de sesión), que una
+prueba de arquitectura tiene en una lista cerrada ([ADR 0016](docs/adr/0016-api-cerrada-por-defecto.md)).
+
+- **Sesión** ([ADR 0017](docs/adr/0017-sesiones-en-el-servidor-y-antiforgery.md)): cookie
+  `__Host-criba_session` (`HttpOnly`, `Secure`, `SameSite=Lax`) con un token opaco; la base guarda
+  su hash y la valida en cada petición. 30 min de inactividad, 12 h máximo, rotación al iniciar
+  sesión y al cambiar de empresa, bloqueo tras 5 intentos.
+- **CSRF**: todo POST, PUT, PATCH y DELETE exige `X-XSRF-TOKEN` (lo da `GET /antiforgery/token`).
+  Las llaves que firman los tokens se guardan cifradas en `data_protection_key`.
+- **Empresas** ([ADR 0018](docs/adr/0018-multiempresa-y-permisos.md)): la sesión fija la empresa
+  activa; toda consulta sobre datos de empresa se filtra por ella y guardar en otra falla.
+- **Permisos**: el rol de la membresía (`Admin`, `Recruiter`, `HiringManager`, `ReadOnly`) da el
+  catálogo que usa la web; cada endpoint exige el suyo como política.
+- **Contraseñas** ([ADR 0013](docs/adr/0013-argon2id-por-defecto.md)): Argon2id, 12 caracteres mínimo.
+
+En `Development` las cookies van sin prefijo y sin `Secure` por HTTP (la web llega por
+`http://localhost`); en cualquier otro entorno, tras un proxy que termina TLS, hay que activar
+`FORWARDED_HEADERS_ENABLED`.
 
 ---
 
@@ -417,6 +462,10 @@ buscar llevan un índice ciego (HMAC). El dominio no lo nota. Diseño, fugas ace
 pendientes en el [ADR 0015](docs/adr/0015-cifrado-de-campos.md); rotación, llave
 comprometida, restauración y baja de una empresa en el
 [runbook](docs/runbooks/cifrado-de-campos.md).
+
+Hoy van cifrados el correo, el nombre y el cargo de los usuarios (llaves de plataforma) y las
+llaves de Data Protection. Cada empresa recibe sus llaves al registrarse, en la misma
+transacción, para los datos de candidatos que llegan después.
 
 Para cifrar un campo nuevo: declararlo en `EncryptedFields`, marcarlo con
 `.IsEncrypted(...)` en su configuración de EF y generar la migración. Sobre un campo cifrado
@@ -445,9 +494,9 @@ Con `CORS_ENABLED=true`:
 | Orígenes | Solo los de `CORS_ALLOWED_ORIGINS`, comparados literalmente: esquema, host y puerto. `https://*.dominio.com` admite cualquier subdominio, no el dominio raíz. `*` y `null` se rechazan |
 | Validación | Al arrancar. Un origen mal escrito (sin esquema, con ruta, `*`) detiene el proceso con un mensaje que nombra la variable y el valor |
 | Métodos | `GET POST PUT DELETE`: los que usa la API. Se amplían en `CorsPolicyOptions`, en un sitio |
-| Cabeceras admitidas | `Authorization`, `Content-Type`, `X-Correlation-Id` |
-| Cabeceras expuestas | `X-Correlation-Id` (para reportar un error), `Retry-After` (tras un 429), `Location` (tras un 201). Sin exponerlas, el script del navegador no puede leerlas |
-| Credenciales | No, salvo `CORS_ALLOW_CREDENTIALS=true`. El token Bearer viaja en `Authorization` y **no** es una credencial CORS; solo las cookies lo son. Con comodín de subdominio y credenciales, el arranque avisa |
+| Cabeceras admitidas | `Authorization`, `Content-Type`, `X-Correlation-Id`, `X-XSRF-TOKEN`, `Idempotency-Key` |
+| Cabeceras expuestas | `X-Correlation-Id` (para reportar un error), `Retry-After` (tras un 429), `Location` (tras un 201), `Idempotency-Replayed`. Sin exponerlas, el script del navegador no puede leerlas |
+| Credenciales | No, salvo `CORS_ALLOW_CREDENTIALS=true`. La sesión es una cookie: si la web va en otro origen, hace falta activarlas con el origen exacto. Lo recomendado es el mismo origen (proxy inverso), sin CORS. Con comodín de subdominio y credenciales, el arranque avisa |
 | Preflight | Respondido antes que el resto del pipeline; cacheable `CORS_PREFLIGHT_MAX_AGE_SECONDS` |
 | Errores | Las cabeceras CORS acompañan también a las respuestas de error: sin ellas, el navegador oculta el Problem Details al script |
 
@@ -455,13 +504,13 @@ Con `CORS_ENABLED=true`:
 
 ## ❗ Decisiones Intencionales
 
+Incluye, adaptado de las ramas `full` y `multitenant` de la plantilla: sesión con cookie y
+antiforgery, permisos por rol, multiempresa, idempotencia, caché y límites de peticiones.
+
 No incluye:
 
-- Autenticación y autorización (rama `full`)
-- Idempotencia, cache, rate limiting y OpenTelemetry (rama `full`)
-- Multitenancy (rama `multitenant`)
-- Cookies / sesiones
-- CSRF
+- OpenTelemetry (rama `full`): pendiente de elegir dónde se envía
+- Verificación de correo, recuperación de contraseña, Google e invitaciones: necesitan envío de correo
 - HTTPS redirection / HSTS (responsabilidad del proxy que termina TLS)
 
 ---
