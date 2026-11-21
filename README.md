@@ -130,6 +130,9 @@ La API se configura con **variables de entorno (.env)** en lugar de `appsettings
 | ASPNETCORE_URLS                | —          | URL y puerto de la API |
 | HTTP_MAX_REQUEST_BODY_BYTES    | 1048576    | Tamaño máximo del cuerpo de una petición. Por encima, `413` |
 | DATABASE_CONNECTION_STRING     | obligatoria | Cadena de conexión a PostgreSQL |
+| FIELD_ENCRYPTION_KEK_PROVIDER  | obligatoria | Llave maestra del cifrado de campos: `aws-kms` o `local` (solo `Development` y `Testing`) |
+| FIELD_ENCRYPTION_KMS_KEY_ID    | —          | Id, ARN o alias de la llave de AWS KMS. Obligatoria con `aws-kms` |
+| FIELD_ENCRYPTION_LOCAL_KEK     | —          | 32 bytes en base64 (`openssl rand -base64 32`). Obligatoria con `local` |
 | LOG_LEVEL                      | Information | Nivel mínimo de log |
 | LOG_FORMAT                     | json       | `json` (estructurado) o `text` (desarrollo) |
 | SWAGGER_ENABLED                | true (`false` en la imagen Docker) | Expone el documento OpenAPI (`/openapi/v1.json`) y Swagger UI (`/swagger`) |
@@ -325,8 +328,21 @@ docker buildx build --platform linux/amd64,linux/arm64 -t registry/api:1.2.3 --p
 | Tipo               | Descripción |
 |-------------------|------------|
 | Unit Tests         | Dominio y lógica pura |
-| Integration Tests  | API real con WebApplicationFactory sobre SQLite en memoria; no necesita Docker |
+| Integration Tests  | API real con WebApplicationFactory sobre SQLite en memoria. El cifrado de campos se prueba contra PostgreSQL real (ver abajo) |
 | Architecture Tests | Dependencias entre capas y convenciones (reloj, handlers, controllers) |
+
+### PostgreSQL para las pruebas de cifrado
+
+Las pruebas del cifrado de campos (`IntegrationTests/FieldEncryption`) corren contra un
+PostgreSQL de verdad: cada una crea su propia base vacía, le aplica las migraciones y la
+borra al terminar. Sin servidor **fallan**, no se saltan. Basta uno desechable:
+
+```bash
+docker run --rm -d --name criba-test-pg -p 55432:5432 -e POSTGRES_HOST_AUTH_METHOD=trust postgres:18
+export TEST_POSTGRES_ADMIN_CONNECTION_STRING='Host=127.0.0.1;Port=55432;Username=postgres;Database=postgres'
+dotnet test
+docker stop criba-test-pg
+```
 
 ### Hooks de pre-commit
 
@@ -381,6 +397,30 @@ dotnet run --project src/Iterasa.ResumeAnalyzer.Api
 | XML Docs             | Obligatorios en públicos |
 | Controllers          | Sin lógica de negocio |
 | Handlers             | Un caso de uso por clase |
+
+---
+
+## 🔒 Autenticación
+
+La API está **cerrada por defecto**: toda ruta exige sesión salvo `/health*` y el documento
+OpenAPI. Mientras no exista el inicio de sesión, cualquier otra ruta responde `401`. Ningún
+controller puede declararse anónimo (lo vigila una prueba de arquitectura). Ver
+[ADR 0016](docs/adr/0016-api-cerrada-por-defecto.md).
+
+---
+
+## 🔐 Cifrado de campos
+
+Los datos personales se cifran en la aplicación antes de llegar a PostgreSQL: AES-256-GCM
+con una llave por empresa, envuelta por una llave maestra en AWS KMS. Los campos que hay que
+buscar llevan un índice ciego (HMAC). El dominio no lo nota. Diseño, fugas aceptadas y
+pendientes en el [ADR 0015](docs/adr/0015-cifrado-de-campos.md); rotación, llave
+comprometida, restauración y baja de una empresa en el
+[runbook](docs/runbooks/cifrado-de-campos.md).
+
+Para cifrar un campo nuevo: declararlo en `EncryptedFields`, marcarlo con
+`.IsEncrypted(...)` en su configuración de EF y generar la migración. Sobre un campo cifrado
+no se filtra, ordena ni agrupa (la aplicación lo rechaza): se busca por su índice ciego.
 
 ---
 

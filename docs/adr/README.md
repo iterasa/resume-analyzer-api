@@ -15,3 +15,5 @@ descartadas, consecuencias.
 | [0009](0009-fluentassertions-7.md) | FluentAssertions fijado en 7.x por licencia | Aceptada |
 | [0010](0010-contenedor-sin-root-y-sdk-fijado.md) | Contenedor sin root con `HEALTHCHECK`; SDK fijado con `global.json` | Aceptada |
 | [0014](0014-hooks-de-pre-commit.md) | Hooks de pre-commit sin dependencias: gitleaks y formato | Aceptada |
+| [0015](0015-cifrado-de-campos.md) | Cifrado de campos en la aplicación: llave por empresa en AWS KMS e índices ciegos | Aceptada |
+| [0016](0016-api-cerrada-por-defecto.md) | API cerrada por defecto: toda ruta exige sesión salvo las declaradas anónimas | Aceptada |
