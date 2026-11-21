@@ -57,7 +57,8 @@ jobs:
           persist-credentials: false
 
       - name: Validate each commit in branch
-        # Por variables de entorno y no interpoladas en el script, como en template-cleanup.
+        # Por variables de entorno y no interpoladas en el script: así un valor con comillas
+        # o $( ) no puede inyectar órdenes.
         env:
           EVENT_NAME: ${{ github.event_name }}
           BASE_REF: ${{ github.base_ref }}

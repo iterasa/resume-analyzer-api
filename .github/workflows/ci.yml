@@ -1,9 +1,5 @@
 # Lo que bloquea de verdad (ADR 0014): secretos, formato, compilación y pruebas en cada PR
 # y en cada push a main. .githooks/pre-commit es la misma red, pero local y saltable.
-#
-# Este fichero no debe contener el nombre de la plantilla: el renombrado lo modificaría,
-# y GitHub no deja que el GITHUB_TOKEN de template-cleanup.yml modifique workflows.
-# scripts/verify-template.sh lo comprueba.
 name: CI
 
 on:

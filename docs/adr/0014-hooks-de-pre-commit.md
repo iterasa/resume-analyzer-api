@@ -13,7 +13,7 @@ gestor (`pre-commit`, Husky) es el primero que nadie instala.
 
 - `.githooks/pre-commit` en el repositorio, en bash: `gitleaks` sobre lo que entra en el
   commit y `dotnet format --verify-no-changes` sobre los `.cs` modificados. Nada más.
-- Se activa con `git config core.hooksPath .githooks`; `setup-template.sh` lo hace.
+- Se activa una vez por clon con `git config core.hooksPath .githooks`.
 - Sin `gitleaks` instalado el hook **falla** con instrucciones: una comprobación de
   secretos que se salta en silencio no protege de nada. `git commit --no-verify` sigue
   siendo la salida consciente.

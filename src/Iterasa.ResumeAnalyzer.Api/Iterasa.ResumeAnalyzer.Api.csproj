@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <AssemblyName>Iterasa.ResumeAnalyzer.Api</AssemblyName>
+    <RootNamespace>Iterasa.ResumeAnalyzer.Api</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Iterasa.ResumeAnalyzer.Application\Iterasa.ResumeAnalyzer.Application.csproj" />
+    <ProjectReference Include="..\Iterasa.ResumeAnalyzer.Infrastructure\Iterasa.ResumeAnalyzer.Infrastructure.csproj" />
+    <ProjectReference Include="..\Iterasa.ResumeAnalyzer.Shared\Iterasa.ResumeAnalyzer.Shared.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Asp.Versioning.Mvc" />
+    <PackageReference Include="Asp.Versioning.Mvc.ApiExplorer" />
+    <PackageReference Include="Asp.Versioning.OpenApi" />
+    <PackageReference Include="Serilog.AspNetCore" />
+    <PackageReference Include="Serilog.Formatting.Compact" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="Swashbuckle.AspNetCore.SwaggerUI" />
+  </ItemGroup>
+</Project>

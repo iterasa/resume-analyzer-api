@@ -2,17 +2,14 @@
 
 ## 🐛 Bug que arregla
 
-
 ## 🔗 Issue
 Closes #
 
 ## 🔍 Causa raíz
 <!-- Qué estaba pasando internamente y por qué -->
 
-
 ## 🛠️ Solución
 <!-- Qué hace tu cambio y por qué soluciona la causa raíz -->
-
 
 ## 🧪 Cómo reproducir el bug (antes del fix)
 1. 
@@ -29,7 +26,6 @@ Closes #
 - [ ] Ninguno
 
 ### Detalle
-
 
 ## 🛡️ Prevención
 - [ ] Agregado test de regresión

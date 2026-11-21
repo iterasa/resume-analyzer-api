@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>Iterasa.ResumeAnalyzer.Shared</AssemblyName>
+    <RootNamespace>Iterasa.ResumeAnalyzer.Shared</RootNamespace>
+  </PropertyGroup>
+</Project>

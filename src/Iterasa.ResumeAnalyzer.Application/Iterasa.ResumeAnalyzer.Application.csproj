@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>Iterasa.ResumeAnalyzer.Application</AssemblyName>
+    <RootNamespace>Iterasa.ResumeAnalyzer.Application</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Iterasa.ResumeAnalyzer.Domain\Iterasa.ResumeAnalyzer.Domain.csproj" />
+    <ProjectReference Include="..\Iterasa.ResumeAnalyzer.Shared\Iterasa.ResumeAnalyzer.Shared.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+  </ItemGroup>
+</Project>

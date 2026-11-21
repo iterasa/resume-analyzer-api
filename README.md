@@ -1,6 +1,6 @@
-# Dotnet API Template
+# Resume Analyzer API
 
-Plantilla base para construir APIs modernas en **.NET 10** con arquitectura limpia, buenas prácticas y configuración lista para producción.
+API de Resume Analyzer en **.NET 10**, con arquitectura limpia, buenas prácticas y configuración lista para producción. Parte de la plantilla `dotnet-api-template`.
 
 ---
 
@@ -45,40 +45,18 @@ Proveer una base consistente y mantenible para desarrollo de APIs backend, reduc
 
 ```
 src/
-  Company.Product.Template.Api
-  Company.Product.Template.Application
-  Company.Product.Template.Domain
-  Company.Product.Template.Infrastructure
-  Company.Product.Template.Shared
+  Iterasa.ResumeAnalyzer.Api
+  Iterasa.ResumeAnalyzer.Application
+  Iterasa.ResumeAnalyzer.Domain
+  Iterasa.ResumeAnalyzer.Infrastructure
+  Iterasa.ResumeAnalyzer.Shared
 
 tests/
-  Company.Product.Template.UnitTests
-  Company.Product.Template.IntegrationTests
-  Company.Product.Template.ArchitectureTests
+  Iterasa.ResumeAnalyzer.UnitTests
+  Iterasa.ResumeAnalyzer.IntegrationTests
+  Iterasa.ResumeAnalyzer.ArchitectureTests
 ```
 
-<!-- plantilla:inicio -->
-## 🌿 Ramas
-
-La plantilla se publica en tres ramas con la misma base y la misma estructura de carpetas:
-solo cambian las features disponibles, y cada rama contiene a la anterior.
-
-| Rama | Contiene |
-|------|----------|
-| `main` | La base: capas y convenciones vigiladas por tests de arquitectura, Problem Details, health checks, OpenAPI y versionado, logging estructurado con correlación, CORS, cabeceras de seguridad y Docker. Un CRUD de usuarios de ejemplo, sin autenticación |
-| `full` | `main` + identidad y acceso (JWT, roles, permisos, credenciales de API y revocación), idempotencia, cache, rate limiting y OpenTelemetry |
-| `multitenant` | `full` + tenants, tipos de usuario e identidad acotada por tenant |
-
-Los cambios de base (convenciones, dependencias, tooling, contrato de error…) entran
-siempre en `main` y suben con merge: `main` → `full` → `multitenant`. Una feature nunca se
-escribe en una rama inferior a la que le corresponde. Así, `git diff main full` y
-`git diff full multitenant` muestran solo features.
-
-Para empezar un proyecto, ver [Crear un proyecto desde la plantilla](#-crear-un-proyecto-desde-la-plantilla).
-
----
-
-<!-- plantilla:fin -->
 ## 🧭 Cómo está organizado el código
 
 ```
@@ -143,7 +121,7 @@ devuelven `PagedResult<T>`.
 
 ## ⚙️ Configuración
 
-La plantilla usa **variables de entorno (.env)** en lugar de `appsettings.json`.
+La API se configura con **variables de entorno (.env)** en lugar de `appsettings.json`.
 
 ### Variables principales
 
@@ -299,7 +277,7 @@ desplazamiento cabe en un entero.
 
 ## 🗄️ Migraciones
 
-Viven en `src/Company.Product.Template.Infrastructure/Migrations`. La capa de API no referencia EF
+Viven en `src/Iterasa.ResumeAnalyzer.Infrastructure/Migrations`. La capa de API no referencia EF
 Core Tools: el contexto de diseño lo construye `AppDbContextFactory`, que solo necesita
 `DATABASE_CONNECTION_STRING`. La herramienta `dotnet-ef` está fijada en
 `.config/dotnet-tools.json`, a la misma versión que el runtime de EF: `dotnet tool restore`
@@ -308,8 +286,8 @@ la deja lista sin instalar nada global.
 ```bash
 dotnet tool restore
 export DATABASE_CONNECTION_STRING='Host=localhost;Port=5432;Database=...;Username=...;Password=...'
-dotnet ef migrations add <Nombre> --project src/Company.Product.Template.Infrastructure --startup-project src/Company.Product.Template.Infrastructure
-dotnet ef database update --project src/Company.Product.Template.Infrastructure --startup-project src/Company.Product.Template.Infrastructure
+dotnet ef migrations add <Nombre> --project src/Iterasa.ResumeAnalyzer.Infrastructure --startup-project src/Iterasa.ResumeAnalyzer.Infrastructure
+dotnet ef database update --project src/Iterasa.ResumeAnalyzer.Infrastructure --startup-project src/Iterasa.ResumeAnalyzer.Infrastructure
 ```
 
 La concurrencia optimista usa `xmin`, columna de sistema de PostgreSQL: si al generar
@@ -350,12 +328,6 @@ docker buildx build --platform linux/amd64,linux/arm64 -t registry/api:1.2.3 --p
 | Integration Tests  | API real con WebApplicationFactory sobre SQLite en memoria; no necesita Docker |
 | Architecture Tests | Dependencias entre capas y convenciones (reloj, handlers, controllers) |
 
-<!-- plantilla:inicio -->
-La propia plantilla se verifica con `scripts/verify-template.sh`: renombra una copia,
-comprueba que no sobrevive el nombre anterior ni nada propio de la plantilla, compila y
-ejecuta todo.
-<!-- plantilla:fin -->
-
 ### Hooks de pre-commit
 
 `.githooks/pre-commit` pasa **gitleaks** sobre lo que entra en el commit y `dotnet format
@@ -375,40 +347,6 @@ las acciones. Las versiones mayores de NuGet y de Docker quedan fuera, porque va
 
 ---
 
-<!-- plantilla:inicio -->
-## 🧬 Crear un proyecto desde la plantilla
-
-El repositorio es una plantilla de GitHub. Un proyecto nuevo se crea en dos pasos, sin
-clonar la plantilla:
-
-```bash
-# 1. Repositorio nuevo con las tres ramas de la plantilla
-gh repo create <owner>/<repo> --private --template luis-veliz/dotnet-api-template --include-all-branches
-
-# 2. Variante y nombre: deja en main la rama elegida, renombrada, y borra las demás
-gh workflow run template-cleanup.yml -R <owner>/<repo> -f variante=full -f company=Acme -f product=Billing
-```
-
-Desde la web es lo mismo: *Use this template* marcando **Include all branches** y, en el
-repositorio nuevo, *Actions → Template cleanup → Run workflow*.
-
-El workflow ejecuta `setup-template.sh`, que sustituye `Company.Product.Template` por el
-nombre nuevo (`Acme.Billing`) en solución, namespaces y carpetas, y retira todo lo que solo
-sirve a la plantilla: este apartado, la sección «Ramas», `scripts/verify-template.sh`, el
-propio workflow y el script. El proyecto nace con historial propio y sin remoto hacia la
-plantilla: un push suyo nunca llega a ella.
-
-Sin GitHub, en local:
-
-```bash
-git clone -b <rama> --single-branch <repo-url> <carpeta> && cd <carpeta>
-rm -rf .git && git init
-bash setup-template.sh <Company> <Product>
-```
-
----
-
-<!-- plantilla:fin -->
 ## 🚀 Puesta en marcha
 
 ### 1. Activar los hooks de pre-commit
@@ -429,7 +367,7 @@ cp .env.example .env
 dotnet tool restore
 dotnet build
 dotnet test
-dotnet run --project src/Company.Product.Template.Api
+dotnet run --project src/Iterasa.ResumeAnalyzer.Api
 ```
 
 ---
@@ -453,7 +391,7 @@ Toda respuesta lleva `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`,
 endpoint no dice otra cosa, `Cache-Control: no-store`. La cabecera `Server` no se emite.
 El cuerpo de una petición se limita a `HTTP_MAX_REQUEST_BODY_BYTES`.
 
-La plantilla asume que **el TLS termina en un proxy inverso**: no redirige a HTTPS ni
+La API asume que **el TLS termina en un proxy inverso**: no redirige a HTTPS ni
 emite `Strict-Transport-Security`; es el proxy quien debe hacerlo. Si la API se expone
 directamente, añade ambas cosas en `Program.cs`.
 

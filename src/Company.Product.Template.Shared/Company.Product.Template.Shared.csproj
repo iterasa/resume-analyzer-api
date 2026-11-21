@@ -1,6 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <AssemblyName>Company.Product.Template.Shared</AssemblyName>
-    <RootNamespace>Company.Product.Template.Shared</RootNamespace>
-  </PropertyGroup>
-</Project>

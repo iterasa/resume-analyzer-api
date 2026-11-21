@@ -2,16 +2,13 @@
 
 ## 🎯 Qué funcionalidad agrega
 
-
 ## 🧠 Contexto / problema que resuelve
-
 
 ## 🔗 Issue
 Closes #
 
 ## 🏗️ Diseño / enfoque técnico
 <!-- Decisiones de arquitectura relevantes, trade-offs, alternativas descartadas -->
-
 
 ## 🚀 Impacto en despliegue
 - [ ] Variables de entorno nuevas (detallar abajo)
@@ -20,7 +17,6 @@ Closes #
 - [ ] Ninguno
 
 ### Detalle
-
 
 ## 🧪 Cómo probar
 1. 

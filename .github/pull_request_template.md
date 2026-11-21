@@ -7,7 +7,6 @@ Ejemplo: feat(auth): add refresh-token rotation
 ## 📝 Qué cambia
 <!-- 1-3 líneas: QUÉ hace este PR y POR QUÉ (contexto de negocio o técnico) -->
 
-
 ## 🏷️ Tipo de cambio
 - [ ] feat (nueva funcionalidad)
 - [ ] fix (bug fix)
@@ -43,7 +42,6 @@ Migraciones:
 Infra:
   - Nuevo bucket S3, nuevo cron, nueva cola, etc.
 -->
-
 
 ## 🧪 Cómo probar
 1. 

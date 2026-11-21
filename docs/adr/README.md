@@ -4,11 +4,6 @@ Una decisión por fichero, numerada y nunca editada una vez aceptada: para cambi
 escribe otra que la sustituye y se enlazan. Formato: contexto, decisión, alternativas
 descartadas, consecuencias.
 
-<!-- plantilla:inicio -->
-La numeración es común a las tres ramas de la plantilla (ver «Ramas» en el README): los
-números que faltan aquí son decisiones de features que viven en `full` o `multitenant`.
-
-<!-- plantilla:fin -->
 | Nº | Decisión | Estado |
 |---|---|---|
 | [0001](0001-capas-y-shared-kernel.md) | Cinco proyectos, dominio `internal`, `Shared` como núcleo compartido | Aceptada |

@@ -17,7 +17,6 @@ fix: ...
 ## ⚠️ BREAKING CHANGES
 <!-- Lista cada breaking y cómo migrar. Si no hay, pon "Ninguno" -->
 
-
 ## 🚀 Checklist pre-deploy
 - [ ] Todas las PRs del release están mergeadas en develop
 - [ ] CI verde en develop (último commit)

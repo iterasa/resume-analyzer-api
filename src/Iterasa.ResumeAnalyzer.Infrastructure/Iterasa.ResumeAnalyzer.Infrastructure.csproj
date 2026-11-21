@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>Iterasa.ResumeAnalyzer.Infrastructure</AssemblyName>
+    <RootNamespace>Iterasa.ResumeAnalyzer.Infrastructure</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Iterasa.ResumeAnalyzer.Application\Iterasa.ResumeAnalyzer.Application.csproj" />
+    <ProjectReference Include="..\Iterasa.ResumeAnalyzer.Domain\Iterasa.ResumeAnalyzer.Domain.csproj" />
+    <ProjectReference Include="..\Iterasa.ResumeAnalyzer.Shared\Iterasa.ResumeAnalyzer.Shared.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Configuration/" />
+    <Folder Include="Persistence/Seeds/" />
+  </ItemGroup>
+</Project>

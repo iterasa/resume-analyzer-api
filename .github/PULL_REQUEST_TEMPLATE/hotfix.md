@@ -7,16 +7,12 @@
 
 ## 💥 Qué está roto en prod ahora
 
-
 ## 👥 Impacto en usuarios
 <!-- Cuántos usuarios afectados, qué no pueden hacer, desde cuándo -->
 
-
 ## 🔍 Causa raíz (si se conoce)
 
-
 ## 🛠️ Fix aplicado
-
 
 ## 🧪 Cómo verificar
 1. 
@@ -29,7 +25,6 @@
 
 ## 🔁 Plan de rollback
 <!-- Si el hotfix empeora las cosas -->
-
 
 ## ✅ Checklist express
 - [ ] Fix validado localmente

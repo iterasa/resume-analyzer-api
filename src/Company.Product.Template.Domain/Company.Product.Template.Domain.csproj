@@ -1,9 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <AssemblyName>Company.Product.Template.Domain</AssemblyName>
-    <RootNamespace>Company.Product.Template.Domain</RootNamespace>
-  </PropertyGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\Company.Product.Template.Shared\Company.Product.Template.Shared.csproj" />
-  </ItemGroup>
-</Project>
